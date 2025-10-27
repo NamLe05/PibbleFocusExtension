@@ -23,8 +23,8 @@ type PetContextValue = {
 const PetContext = createContext<PetContextValue | null>(null)
 const STORAGE_KEY = 'petState'
 
-const HAPPINESS_DECAY_RATE = 5 // Amount happiness decreases per hour
-const HUNGER_DECAY_RATE = 10 // Amount hunger decreases per hour
+const HAPPINESS_DECAY_RATE = 15 // Amount happiness decreases per hour
+const HUNGER_DECAY_RATE = 20 // Amount hunger decreases per hour
 
 const calculateLevel = (exp: number): number => {
     if (exp < 50) return 1

@@ -35,7 +35,7 @@
     const shadow = host.attachShadow({ mode: 'open' });
 
     // Styles (scoped to shadow)
-    const style = document.createElement('style');
+    const style = document.createElement('style')
     style.textContent = `
     :host { all: initial; }
     .wrap { position: relative; width: 100%; height: 100%; }
@@ -44,9 +44,22 @@
       cursor: grab; user-select: none; -webkit-user-drag: none;
       filter: drop-shadow(0 8px 18px rgba(0,0,0,0.25));
       transition: transform .12s ease;
-      touch-action: none; /* allow pointer events for dragging */
+      touch-action: none;
+      transform-origin: bottom center;              /* match petStyles */
+      animation: rockingMotion 3s ease-in-out infinite; /* rock back/forth */
     }
     .pet:active { transform: translateY(1px) scale(0.99); cursor: grabbing; }
+
+    /* Same keyframes as petStyles.css */
+    @keyframes rockingMotion {
+      0%   { transform: rotate(-2deg); }
+      50%  { transform: rotate(2deg); }
+      100% { transform: rotate(-2deg); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .pet { animation: none; }
+    }
 
     .bubble {
       position: absolute;
@@ -90,7 +103,7 @@
       position: absolute; top: 6px; right: 8px; border: none; background: transparent;
       font-size: 16px; cursor: pointer; color: #999;
     }
-  `;
+  `
     shadow.appendChild(style);
 
     // Structure

@@ -9,47 +9,41 @@
         s.src = chrome.runtime.getURL('injected/pageBridge.js');
         s.onload = () => s.remove();
         (window as any).__pibbleBridgeInjected = true;
-        (document.documentElement).appendChild(s);
+        document.documentElement.appendChild(s);
     }
 
-    // Track pending bridge requests by requestId
-    const pending = new Map<string, (resp: any) => void>();
+    // Pending replies from pageBridge
+    const pending = new Map<string, (resp: { text?: string; error?: string }) => void>();
 
-    // Listen for bridge responses
     window.addEventListener('message', (event: MessageEvent) => {
         if (event.source !== window) return;
         const data = event.data;
         if (!data || typeof data !== 'object') return;
-
-        if (data.type === 'PBRIDGE_RESPONSE' || data.type === 'PBRIDGE_PONG') {
+        if (data.type === 'PBRIDGE_RESPONSE' && data.requestId) {
             const resolver = pending.get(data.requestId);
             if (resolver) {
-                console.debug(TAG, 'received', data.type, data.info ?? '');
-                resolver({ text: data.text, error: data.error, info: data.info });
+                resolver({ text: data.text, error: data.error });
                 pending.delete(data.requestId);
             }
         }
     });
 
-    function bridgePrompt(userText: string): Promise<string> {
+    function bridgePrompt(fullPrompt: string): Promise<string> {
         ensureBridgeInjected();
-        const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const requestId = `req-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
                 pending.delete(requestId);
-                reject(new Error('Timed out'));
+                reject(new Error('Timed out waiting for pageBridge'));
             }, 30000);
 
             pending.set(requestId, (resp) => {
                 clearTimeout(timeout);
-                if (resp?.error) reject(new Error(resp.error));
-                else resolve(String(resp?.text ?? ''));
+                if (resp.error) reject(new Error(resp.error));
+                else resolve(String(resp.text ?? ''));
             });
 
-            window.postMessage(
-                { type: 'PBRIDGE_REQUEST', requestId, payload: { userText } },
-                '*'
-            );
+            window.postMessage({ type: 'PBRIDGE_REQUEST', requestId, prompt: fullPrompt }, '*');
         });
     }
 
@@ -66,17 +60,19 @@
     }
 
     async function replaceSelection(range: Range, newText: string) {
-        const editableRoot =
+        // contenteditable
+        const root =
             range.commonAncestorContainer instanceof Element
                 ? (range.commonAncestorContainer.closest?.('[contenteditable="true"]') as HTMLElement | null)
                 : null;
 
-        if (editableRoot) {
+        if (root) {
             range.deleteContents();
             range.insertNode(document.createTextNode(newText));
             return true;
         }
 
+        // input/textarea
         const active = document.activeElement as HTMLTextAreaElement | HTMLInputElement | null;
         if (active && (active.tagName === 'TEXTAREA' || (active.tagName === 'INPUT' && (active as any).type === 'text'))) {
             const start = (active as any).selectionStart ?? 0;
@@ -86,7 +82,6 @@
             active.dispatchEvent(new Event('input', { bubbles: true }));
             return true;
         }
-
         return false;
     }
 
@@ -98,33 +93,11 @@
             const ok = range ? await replaceSelection(range, answer) : false;
             if (!ok) await navigator.clipboard.writeText(answer);
         } catch (e) {
-            console.warn('[PibbleAssistant]', e);
+            console.warn(TAG, 'AI error', e);
         }
     }
 
-    // Optional prompt/bridge ping support for other callers
-    function postWithReply(type: 'PBRIDGE_REQUEST' | 'PBRIDGE_PING', payload: any, sendResponse: (resp: any) => void) {
-        const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        pending.set(requestId, sendResponse);
-        console.debug(TAG, 'forwarding', type, 'requestId=', requestId);
-        window.postMessage({ type, requestId, payload }, '*');
-    }
-
-    chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-        if (msg?.type === 'PROMPT_TEXT') {
-            postWithReply('PBRIDGE_REQUEST', {
-                userText: msg.userText,
-                systemPrompt: msg.systemPrompt ?? null,
-                temperature: msg.temperature ?? 0.7
-            }, sendResponse);
-            return true; // async
-        }
-
-        if (msg?.type === 'BRIDGE_PING') {
-            postWithReply('PBRIDGE_PING', {}, sendResponse);
-            return true; // async
-        }
-
+    chrome.runtime.onMessage.addListener((msg) => {
         if (msg?.type === 'AI_PROOFREAD') handle('proofread');
         if (msg?.type === 'AI_REWRITE') handle('rewrite');
     });

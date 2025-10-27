@@ -12,30 +12,43 @@
       window.__pibbleBridgeInjected = true;
       document.documentElement.appendChild(s);
     }
+    const pending = /* @__PURE__ */ new Map();
+    window.addEventListener("message", (event) => {
+      if (event.source !== window) return;
+      const data = event.data;
+      if (!data || typeof data !== "object") return;
+      if (data.type === "PBRIDGE_RESPONSE" || data.type === "PBRIDGE_PONG") {
+        const resolver = pending.get(data.requestId);
+        if (resolver) {
+          console.debug(TAG, "received", data.type, data.info ?? "");
+          resolver({ text: data.text, error: data.error, info: data.info });
+          pending.delete(data.requestId);
+        }
+      }
+    });
+    function bridgePrompt(userText) {
+      ensureBridgeInjected();
+      const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          pending.delete(requestId);
+          reject(new Error("Timed out"));
+        }, 3e4);
+        pending.set(requestId, (resp) => {
+          clearTimeout(timeout);
+          if (resp?.error) reject(new Error(resp.error));
+          else resolve(String(resp?.text ?? ""));
+        });
+        window.postMessage(
+          { type: "PBRIDGE_REQUEST", requestId, payload: { userText } },
+          "*"
+        );
+      });
+    }
     function getSelectionInfo() {
       const sel = window.getSelection();
       if (!sel || sel.rangeCount === 0) return { text: "" };
       return { text: sel.toString(), range: sel.getRangeAt(0) };
-    }
-    function promptModel(text) {
-      ensureBridgeInjected();
-      const reqId = `pbridge-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      return new Promise((resolve, reject) => {
-        const onMessage = (e) => {
-          const d = e.data;
-          if (!d || typeof d !== "object") return;
-          if (d.type === "PBRIDGE_RESPONSE" && d.reqId === reqId) {
-            window.removeEventListener("message", onMessage);
-            d.error ? reject(new Error(d.error)) : resolve(String(d.result || ""));
-          }
-        };
-        window.addEventListener("message", onMessage);
-        window.postMessage({ type: "PBRIDGE_REQUEST", reqId, action: "prompt", text }, "*");
-        setTimeout(() => {
-          window.removeEventListener("message", onMessage);
-          reject(new Error("Timed out"));
-        }, 3e4);
-      });
     }
     function buildPrompt(mode, src) {
       return mode === "proofread" ? `Proofread the following text. Fix grammar, spelling, and clarity. Keep meaning and tone. Return only the corrected text.
@@ -68,27 +81,13 @@ ${src}`;
       try {
         const { text, range } = getSelectionInfo();
         if (!text.trim()) return;
-        const answer = await promptModel(buildPrompt(mode, text));
+        const answer = await bridgePrompt(buildPrompt(mode, text));
         const ok = range ? await replaceSelection(range, answer) : false;
         if (!ok) await navigator.clipboard.writeText(answer);
       } catch (e) {
         console.warn("[PibbleAssistant]", e);
       }
     }
-    const pending = /* @__PURE__ */ new Map();
-    window.addEventListener("message", (event) => {
-      if (event.source !== window) return;
-      const data = event.data;
-      if (!data || typeof data !== "object") return;
-      if (data.type === "PBRIDGE_RESPONSE" || data.type === "PBRIDGE_PONG") {
-        const resolver = pending.get(data.requestId);
-        if (resolver) {
-          console.debug(TAG, "received", data.type, data.info ?? "");
-          resolver({ text: data.text, error: data.error, info: data.info });
-          pending.delete(data.requestId);
-        }
-      }
-    });
     function postWithReply(type, payload, sendResponse) {
       const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       pending.set(requestId, sendResponse);

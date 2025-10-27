@@ -16,7 +16,7 @@
             files: ["content/petOverlay.js"]
             // must exist in public/
           });
-          console.log("[BG] injected petOverlay.js into tab", tab.id);
+          console.log("[BG] injected petOverlay.js into tab", tab?.id);
           sendResponse({ ok: true });
         } catch (e) {
           console.error("[BG] inject failed", e);

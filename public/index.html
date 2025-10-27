@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>Pibble Focus Pet</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+        html,
+        body {
+            width: 320px;
+            height: 520px;
+            margin: 0;
+        }
+
+        body {
+            font-family: -apple-system, system-ui, sans-serif;
+            padding: 12px;
+        }
+
+        button {
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <h3>Pibble Focus Pet</h3>
+    <button id="open">Open Pet Overlay in current tab</button>
+    <script>
+        document.getElementById('open').onclick = () => {
+            chrome.runtime.sendMessage({ type: 'PING_BG' }, (resp) => {
+                if (!resp?.ok) console.warn('[Popup] BG ping failed');
+            });
+            chrome.runtime.sendMessage({ type: 'TOGGLE_PET_OVERLAY' }, (resp) => {
+                if (!resp?.ok) console.warn('[Popup] inject failed:', resp?.error);
+            });
+        };
+    </script>
+</body>
+
+</html>
