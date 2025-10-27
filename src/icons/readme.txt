@@ -1,0 +1,1 @@
+Replace these with your extension icons (16/48/128).

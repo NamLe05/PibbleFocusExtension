@@ -1,0 +1,93 @@
+body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    margin: 0;
+    padding: 0;
+    width: 300px;
+    min-width: 300px;
+    background-color: #FDDDC4FF;
+    -webkit-app-region: drag;
+}
+
+html {
+    background: transparent !important;
+    border-radius: 12px;
+}
+
+.app {
+    width: 300px;
+    height: 500px;
+    margin: 0;
+    padding: 0;
+    background-color: #FDDDC4FF;
+}
+
+header h1 {
+    font-size: 18px;
+    margin: 0 0 0px 0;
+}
+
+main {
+    display: block;
+    margin: 0;
+    padding: 0;
+    background-color: transparent !important;
+}
+
+.card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+
+.nav-container {
+    position: absolute;
+    top: 425px;
+    left: 20px;
+    display: flex;
+    flex-direction: row;
+    /* Changed to row for horizontal layout */
+    gap: 8px;
+    /* Reduced gap for horizontal spacing */
+    background: rgba(35, 35, 35, 1);
+    padding: 8px 16px;
+    /* Adjusted padding for better spacing */
+    border-radius: 20px;
+    height: 50px;
+    width: calc(300px - 70px);
+    z-index: 10;
+    border: 0px;
+    align-items: center;
+    /* Center items vertically */
+    justify-content: center;
+}
+
+.nav-button {
+    width: 30px;
+    height: 30px;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    color: rgba(255, 255, 255, 0.7);
+    z-index: 20;
+    position: relative;
+    margin: 0 8px;
+    /* Added horizontal margin */
+}
+
+.nav-button:hover {
+    transform: scale(1.1);
+    color: white;
+}
+
+.nav-button.active {
+    color: white;
+    transform: scale(1.3);
+    background: rgba(255, 255, 255, 0.1);
+}
