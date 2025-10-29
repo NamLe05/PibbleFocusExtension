@@ -4,13 +4,20 @@
   "version": "0.1.0",
   "description": "A virtual pet study companion",
   "action": {
-    "default_popup": "index.html"
+    "default_popup": "index.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
   "permissions": [
     "activeTab",
     "scripting",
     "storage",
-    "clipboardWrite"
+    "clipboardWrite",
+    "clipboardRead",
+    "offscreen"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -26,7 +33,8 @@
       "js": [
         "content/assistant.js"
       ],
-      "run_at": "document_idle"
+      "run_at": "document_start",
+      "all_frames": true
     }
   ],
   "web_accessible_resources": [
@@ -39,5 +47,10 @@
         "<all_urls>"
       ]
     }
-  ]
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
 }

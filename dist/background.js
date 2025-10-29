@@ -12,7 +12,7 @@
         if (!tab?.id) return sendResponse({ ok: false, error: "No active tab" });
         try {
           await chrome.scripting.executeScript({
-            target: { tabId: tab.id },
+            target: { tabId: tab.id, allFrames: false },
             files: ["content/petOverlay.js"]
             // must exist in public/
           });
@@ -26,13 +26,29 @@
       return true;
     }
     if (msg?.type === "AI_ACTION") {
-      chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
-        if (tab?.id) {
-          chrome.tabs.sendMessage(tab.id, {
-            type: msg.mode === "rewrite" ? "AI_REWRITE" : "AI_PROOFREAD"
-          });
+      chrome.tabs.query({ active: true, currentWindow: true }, async ([tab]) => {
+        if (!tab?.id) {
+          sendResponse({ ok: false });
+          return;
         }
-        sendResponse({ ok: true });
+        const actionType = msg.mode === "rewrite" ? "AI_REWRITE" : "AI_PROOFREAD";
+        console.log("[BG] relaying", actionType, "to tab", tab.id);
+        try {
+          const frames = await chrome.webNavigation.getAllFrames({ tabId: tab.id });
+          console.log("[BG] found", frames?.length || 0, "frames");
+          for (const frame of frames || []) {
+            try {
+              await chrome.tabs.sendMessage(tab.id, { type: actionType }, { frameId: frame.frameId });
+              console.log("[BG] sent to frameId", frame.frameId);
+            } catch (e) {
+              console.debug("[BG] frame", frame.frameId, "not ready:", e);
+            }
+          }
+          sendResponse({ ok: true });
+        } catch (e) {
+          console.error("[BG] relay failed", e);
+          sendResponse({ ok: false, error: String(e) });
+        }
       });
       return true;
     }
