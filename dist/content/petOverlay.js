@@ -42,6 +42,11 @@
     .close:hover{background:rgba(255,255,255,0.25);transform:rotate(90deg)}
     .bubble-body{padding:20px}
     .hint{font-size:12px;opacity:0.85;line-height:1.4;background:rgba(255,255,255,0.1);padding:10px 12px;border-radius:8px;text-align:center;margin-bottom:16px}
+    .summarize-btn{width:100%;padding:12px 16px;border-radius:12px;border:none;background:rgba(255,255,255,0.95);color:#667eea;cursor:pointer;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s;box-shadow:0 4px 12px rgba(0,0,0,0.1);margin-bottom:12px}
+    .summarize-btn:hover{background:#fff;transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.15)}
+    .summarize-btn:active{transform:translateY(0)}
+    .summarize-btn.loading{pointer-events:none;opacity:0.7}
+    .summarize-icon{font-size:18px}
     .action-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
     .action-btn{padding:14px 16px;border-radius:12px;border:none;background:rgba(255,255,255,0.95);color:#667eea;cursor:pointer;font-size:14px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:6px;transition:all .2s;box-shadow:0 4px 12px rgba(0,0,0,0.1)}
     .action-btn:hover{background:#fff;transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.15)}
@@ -63,7 +68,7 @@
     .status{position:absolute;top:-40px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .2s}
     .status.show{opacity:1}
     @keyframes spin{to{transform:rotate(360deg)}}
-    .action-btn.loading .action-icon{animation:spin 1s linear infinite}
+    .action-btn.loading .action-icon,.summarize-btn.loading .summarize-icon{animation:spin 1s linear infinite}
   `;
     shadow.appendChild(style);
     const wrap = document.createElement("div");
@@ -82,7 +87,11 @@
       <button class="close" title="Close">\xD7</button>
     </div>
     <div class="bubble-body">
-      <div class="hint">Copy text, then click an action below</div>
+      <div class="hint">Copy text or click Summarize for page summary</div>
+      <button class="summarize-btn" data-mode="summarize">
+        <span class="summarize-icon">\u{1F4C4}</span>
+        <span>Summarize Page</span>
+      </button>
       <div class="action-grid">
         <button class="action-btn" data-mode="proofread">
           <span class="action-icon">\u{1F4DD}</span>
@@ -114,6 +123,7 @@
     const resultTitle = bubble.querySelector(".result-title");
     const copyBtn = bubble.querySelector(".copy-btn");
     const copyText = copyBtn.querySelector(".copy-text");
+    const summarizeBtn = bubble.querySelector(".summarize-btn");
     let currentResult = "";
     function showStatus(msg, ms = 2e3) {
       statusEl.textContent = msg;
@@ -123,7 +133,12 @@
     function showResult(text, mode) {
       currentResult = text;
       resultContent.textContent = text;
-      resultTitle.textContent = mode === "proofread" ? "Proofread Result" : "Rewrite Result";
+      const titles = {
+        proofread: "Proofread Result",
+        rewrite: "Rewrite Result",
+        summarize: "Page Summary"
+      };
+      resultTitle.textContent = titles[mode] || "Result";
       resultContainer.classList.add("show");
       copyText.textContent = "Copy";
     }
@@ -158,6 +173,19 @@
       } catch (err) {
         showStatus("\u274C Copy failed", 2e3);
       }
+    });
+    summarizeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      summarizeBtn.classList.add("loading");
+      const icon = summarizeBtn.querySelector(".summarize-icon");
+      const orig = icon.textContent;
+      icon.textContent = "\u2699\uFE0F";
+      hideResult();
+      window.postMessage({ type: "PIBBLE_ACTION", mode: "summarize" }, "*");
+      setTimeout(() => {
+        summarizeBtn.classList.remove("loading");
+        icon.textContent = orig;
+      }, 1e3);
     });
     bubble.querySelectorAll(".action-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {

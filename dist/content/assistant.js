@@ -54,7 +54,7 @@
           pending.delete(requestId);
           console.error(TAG, `\u274C AI timeout for requestId: ${requestId}`);
           reject(new Error("AI timeout"));
-        }, 3e4);
+        }, 6e4);
         pending.set(requestId, (resp) => {
           clearTimeout(timeout);
           if (resp.error) {
@@ -82,7 +82,6 @@
         const text = await navigator.clipboard.readText();
         if (text && text.trim()) {
           console.log(TAG, `\u2705 Got ${text.length} chars from clipboard`);
-          console.log(TAG, `Preview: ${text.slice(0, 100)}...`);
           return text.trim();
         }
       } catch (e) {
@@ -90,6 +89,12 @@
       }
       console.log(TAG, "\u274C No text in clipboard");
       return "";
+    }
+    function extractPageText() {
+      const main = document.querySelector('main, article, [role="main"]');
+      const target = main || document.body;
+      const text = target.innerText || target.textContent || "";
+      return text.trim();
     }
     async function handleAIAction(mode) {
       console.log(TAG, `
@@ -109,22 +114,27 @@ ${"\u2550".repeat(80)}`);
             throw new Error("AI initialization timeout");
           }
         }
-        const selectedText = await getSelectionText();
-        if (!selectedText) {
-          console.error(TAG, "\u274C \u274C \u274C NO TEXT IN CLIPBOARD!");
-          console.log(TAG, "Please copy some text (Cmd+C / Ctrl+C) and try again.");
-          window.postMessage({ type: "PIBBLE_STATUS", message: "\u26A0\uFE0F Please copy text first" }, "*");
-          if (window.parent && window.parent !== window) {
-            window.parent.postMessage({ type: "PIBBLE_STATUS", message: "\u26A0\uFE0F Please copy text first" }, "*");
+        let selectedText = "";
+        if (mode === "summarize") {
+          console.log(TAG, "\u{1F4C4} Extracting page text for summarization...");
+          selectedText = extractPageText();
+          if (!selectedText) {
+            throw new Error("No text found on page");
           }
-          return;
+          console.log(TAG, `\u2705 Extracted ${selectedText.length} chars from page`);
+        } else {
+          selectedText = await getSelectionText();
+          if (!selectedText) {
+            console.error(TAG, "\u274C NO TEXT IN CLIPBOARD!");
+            window.postMessage({ type: "PIBBLE_STATUS", message: "\u26A0\uFE0F Please copy text first" }, "*");
+            return;
+          }
+          console.log(TAG, `\u2705 Got text: ${selectedText.length} characters`);
         }
-        console.log(TAG, `\u2705 Got text: ${selectedText.length} characters`);
-        const preview = selectedText.slice(0, 300) + (selectedText.length > 300 ? "..." : "");
-        console.log(TAG, `\u{1F4C4} Text: ${preview}`);
-        window.postMessage({ type: "PIBBLE_STATUS", message: `\u2699\uFE0F ${mode === "proofread" ? "Proofreading" : "Rewriting"}...` }, "*");
+        const statusMsg = mode === "proofread" ? "Proofreading" : mode === "rewrite" ? "Rewriting" : "Summarizing page";
+        window.postMessage({ type: "PIBBLE_STATUS", message: `\u2699\uFE0F ${statusMsg}...` }, "*");
         if (window.parent && window.parent !== window) {
-          window.parent.postMessage({ type: "PIBBLE_STATUS", message: `\u2699\uFE0F ${mode === "proofread" ? "Proofreading" : "Rewriting"}...` }, "*");
+          window.parent.postMessage({ type: "PIBBLE_STATUS", message: `\u2699\uFE0F ${statusMsg}...` }, "*");
         }
         console.log(TAG, `\u{1F916} Calling ${mode} API...`);
         const result = await bridgePrompt(selectedText, mode);
@@ -165,7 +175,7 @@ ${"\u2500".repeat(80)}`);
       if (data.type === "PIBBLE_ACTION") {
         const mode = data.mode;
         console.log(TAG, `\u{1F4E8} \u{1F4E8} \u{1F4E8} Received PIBBLE_ACTION message, mode: ${mode}`);
-        if (mode === "proofread" || mode === "rewrite") {
+        if (mode === "proofread" || mode === "rewrite" || mode === "summarize") {
           handleAIAction(mode);
         } else {
           console.warn(TAG, `\u26A0\uFE0F Unknown mode: ${mode}`);

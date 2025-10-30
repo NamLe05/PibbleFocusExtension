@@ -8,16 +8,18 @@
     const hasSelfAI = typeof self.ai !== 'undefined';
     const hasProofreader = typeof Proofreader !== 'undefined';
     const hasRewriter = typeof Rewriter !== 'undefined';
+    const hasSummarizer = typeof Summarizer !== 'undefined';
 
     console.log(TAG, 'Available APIs:');
     console.log(TAG, '  window.ai:', hasWindowAI);
     console.log(TAG, '  self.ai:', hasSelfAI);
     console.log(TAG, '  Proofreader:', hasProofreader);
     console.log(TAG, '  Rewriter:', hasRewriter);
+    console.log(TAG, '  Summarizer:', hasSummarizer);
 
     const ai = hasWindowAI ? window.ai : (hasSelfAI ? self.ai : null);
 
-    if (!ai && !hasProofreader && !hasRewriter) {
+    if (!ai && !hasProofreader && !hasRewriter && !hasSummarizer) {
         console.error(TAG, 'No AI APIs available!');
         console.error(TAG, 'Enable chrome://flags for AI features');
     }
@@ -25,6 +27,7 @@
     let promptSession = null;
     let proofreaderSession = null;
     let rewriterSession = null;
+    let summarizerSession = null;
 
     async function createProofreaderSession() {
         if (!hasProofreader) return null;
@@ -33,6 +36,11 @@
             console.log(TAG, 'Creating Proofreader session...');
             const availability = await Proofreader.availability();
             console.log(TAG, 'Proofreader availability:', availability);
+
+            if (availability === 'no') {
+                console.error(TAG, 'Proofreader not available');
+                return null;
+            }
 
             const pr = await Proofreader.create({
                 expectedInputLanguages: ['en'],
@@ -61,7 +69,7 @@
 
         console.log(TAG, 'Using Proofreader API...');
         const result = await proofreaderSession.proofread(text);
-        const correctedText = result.corrected || text;
+        const correctedText = result.corrected || result || text;
         console.log(TAG, 'Proofreader done, length:', correctedText.length);
         return correctedText;
     }
@@ -74,7 +82,11 @@
             const availability = await Rewriter.availability();
             console.log(TAG, 'Rewriter availability:', availability);
 
-            // Randomize tone and format for variety
+            if (availability === 'no') {
+                console.error(TAG, 'Rewriter not available');
+                return null;
+            }
+
             const tones = ['as-is', 'more-formal', 'more-casual'];
             const formats = ['as-is', 'plain-text'];
             const lengths = ['as-is', 'shorter', 'longer'];
@@ -105,7 +117,6 @@
     }
 
     async function useRewriter(text) {
-        // ALWAYS create a new session for variety
         console.log(TAG, 'Destroying old rewriter session for fresh results...');
         if (rewriterSession) {
             try {
@@ -127,6 +138,55 @@
         const rewrittenText = result || text;
         console.log(TAG, 'Rewriter done, length:', rewrittenText.length);
         return rewrittenText;
+    }
+
+    async function createSummarizerSession() {
+        if (!hasSummarizer) return null;
+
+        try {
+            console.log(TAG, 'Creating Summarizer session...');
+            const availability = await Summarizer.availability();
+            console.log(TAG, 'Summarizer availability:', availability);
+
+            if (availability === 'no') {
+                console.error(TAG, 'Summarizer not available');
+                return null;
+            }
+
+            const sm = await Summarizer.create({
+                type: 'key-points',
+                format: 'markdown',
+                length: 'medium',
+                sharedContext: 'Summarize webpage content into clear bullet points',
+                monitor(m) {
+                    m.addEventListener('downloadprogress', (e) => {
+                        console.log(TAG, 'Summarizer download:', Math.round(e.loaded * 100) + '%');
+                    });
+                }
+            });
+            console.log(TAG, 'Summarizer session created');
+            return sm;
+        } catch (e) {
+            console.error(TAG, 'Summarizer creation failed:', e);
+            return null;
+        }
+    }
+
+    async function useSummarizer(text) {
+        if (!summarizerSession) {
+            summarizerSession = await createSummarizerSession();
+        }
+
+        if (!summarizerSession) {
+            throw new Error('Summarizer API unavailable');
+        }
+
+        console.log(TAG, 'Using Summarizer API...');
+        const result = await summarizerSession.summarize(text, {
+            context: 'This is content from a webpage that needs to be summarized concisely.'
+        });
+        console.log(TAG, 'Summarizer done, length:', result.length);
+        return result;
     }
 
     async function createPromptSession() {
@@ -160,7 +220,6 @@
     }
 
     async function usePromptAPI(text, mode) {
-        // For rewrite, always create new session for variety
         if (mode === 'rewrite') {
             console.log(TAG, 'Destroying old prompt session for rewrite variety...');
             if (promptSession) {
@@ -186,8 +245,9 @@
         let prompt;
         if (mode === 'proofread') {
             prompt = 'Proofread the following text. Fix grammar, spelling, and punctuation. Return only the corrected text.\n\n' + text;
+        } else if (mode === 'summarize') {
+            prompt = 'Summarize the following text into 5-7 key bullet points. Use clear, concise language. Format as a markdown list.\n\n' + text;
         } else {
-            // Add randomness to rewrite prompts
             const styles = [
                 'Rewrite the following text to be clearer and more concise.',
                 'Rewrite the following text with a fresh perspective and varied phrasing.',
@@ -229,6 +289,16 @@
                     result = await usePromptAPI(text, mode);
                 } else {
                     throw new Error('No API available for rewriting');
+                }
+            } else if (mode === 'summarize') {
+                if (hasSummarizer) {
+                    console.log(TAG, 'Strategy: Summarizer API');
+                    result = await useSummarizer(text);
+                } else if (ai) {
+                    console.log(TAG, 'Strategy: Prompt API fallback');
+                    result = await usePromptAPI(text, mode);
+                } else {
+                    throw new Error('No API available for summarizing');
                 }
             } else {
                 throw new Error('Unknown mode: ' + mode);
@@ -281,5 +351,6 @@
     console.log(TAG, 'Bridge ready');
     console.log(TAG, 'Proofreader:', hasProofreader ? 'YES' : 'NO');
     console.log(TAG, 'Rewriter:', hasRewriter ? 'YES' : 'NO');
+    console.log(TAG, 'Summarizer:', hasSummarizer ? 'YES' : 'NO');
     console.log(TAG, 'Prompt API:', ai ? 'YES' : 'NO');
 })();

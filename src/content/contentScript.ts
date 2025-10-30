@@ -19,7 +19,6 @@
         s.onload = () => {
             console.log(TAG, '✅ Page bridge script loaded');
             s.remove();
-            // Give it a moment to initialize
             setTimeout(() => {
                 bridgeReady = true;
                 console.log(TAG, '✅ Bridge ready for requests');
@@ -32,7 +31,6 @@
         document.documentElement.appendChild(s);
     }
 
-    // Inject bridge immediately on load
     ensureBridgeInjected();
 
     const pending = new Map<string, (resp: { text?: string; error?: string }) => void>();
@@ -52,7 +50,7 @@
         }
     });
 
-    function bridgePrompt(text: string, mode: 'proofread' | 'rewrite'): Promise<string> {
+    function bridgePrompt(text: string, mode: 'proofread' | 'rewrite' | 'summarize'): Promise<string> {
         console.log(TAG, `bridgePrompt() called for ${mode}`);
         const requestId = `req-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         console.log(TAG, `🤖 Sending to AI, requestId: ${requestId}`);
@@ -63,7 +61,7 @@
                 pending.delete(requestId);
                 console.error(TAG, `❌ AI timeout for requestId: ${requestId}`);
                 reject(new Error('AI timeout'));
-            }, 30000);
+            }, 60000); // 60s for summarize
 
             pending.set(requestId, (resp) => {
                 clearTimeout(timeout);
@@ -88,37 +86,38 @@
         });
     }
 
-    // Get text from clipboard
     async function getSelectionText(): Promise<string> {
         console.log(TAG, '🔍 Getting text from clipboard...');
-
         try {
             const text = await navigator.clipboard.readText();
             if (text && text.trim()) {
                 console.log(TAG, `✅ Got ${text.length} chars from clipboard`);
-                console.log(TAG, `Preview: ${text.slice(0, 100)}...`);
                 return text.trim();
             }
         } catch (e) {
             console.error(TAG, '❌ Clipboard read failed:', e);
         }
-
         console.log(TAG, '❌ No text in clipboard');
         return '';
     }
 
-    async function handleAIAction(mode: 'proofread' | 'rewrite') {
+    function extractPageText(): string {
+        const main = document.querySelector('main, article, [role="main"]');
+        const target = (main || document.body) as HTMLElement;
+        const text = target.innerText || target.textContent || '';
+        return text.trim();
+    }
+
+    async function handleAIAction(mode: 'proofread' | 'rewrite' | 'summarize') {
         console.log(TAG, `\n${'═'.repeat(80)}`);
         console.log(TAG, `🎯 🎯 🎯 ${mode.toUpperCase()} ACTION TRIGGERED 🎯 🎯 🎯`);
         console.log(TAG, `${'═'.repeat(80)}`);
 
         try {
-            // Check if bridge is ready
             if (!bridgeReady) {
                 console.warn(TAG, '⚠️ Bridge not ready yet, waiting...');
                 window.postMessage({ type: 'PIBBLE_STATUS', message: '⏳ Initializing AI...' }, '*');
 
-                // Wait for bridge to be ready
                 let attempts = 0;
                 while (!bridgeReady && attempts < 20) {
                     await new Promise(resolve => setTimeout(resolve, 100));
@@ -130,30 +129,35 @@
                 }
             }
 
-            // STEP 1: Get text from clipboard
-            const selectedText = await getSelectionText();
+            let selectedText = '';
 
-            if (!selectedText) {
-                console.error(TAG, '❌ ❌ ❌ NO TEXT IN CLIPBOARD!');
-                console.log(TAG, 'Please copy some text (Cmd+C / Ctrl+C) and try again.');
+            if (mode === 'summarize') {
+                console.log(TAG, '📄 Extracting page text for summarization...');
+                selectedText = extractPageText();
 
-                window.postMessage({ type: 'PIBBLE_STATUS', message: '⚠️ Please copy text first' }, '*');
-                if (window.parent && window.parent !== window) {
-                    window.parent.postMessage({ type: 'PIBBLE_STATUS', message: '⚠️ Please copy text first' }, '*');
+                if (!selectedText) {
+                    throw new Error('No text found on page');
                 }
-                return;
+
+                console.log(TAG, `✅ Extracted ${selectedText.length} chars from page`);
+            } else {
+                selectedText = await getSelectionText();
+
+                if (!selectedText) {
+                    console.error(TAG, '❌ NO TEXT IN CLIPBOARD!');
+                    window.postMessage({ type: 'PIBBLE_STATUS', message: '⚠️ Please copy text first' }, '*');
+                    return;
+                }
+
+                console.log(TAG, `✅ Got text: ${selectedText.length} characters`);
             }
 
-            console.log(TAG, `✅ Got text: ${selectedText.length} characters`);
-            const preview = selectedText.slice(0, 300) + (selectedText.length > 300 ? '...' : '');
-            console.log(TAG, `📄 Text: ${preview}`);
-
-            window.postMessage({ type: 'PIBBLE_STATUS', message: `⚙️ ${mode === 'proofread' ? 'Proofreading' : 'Rewriting'}...` }, '*');
+            const statusMsg = mode === 'proofread' ? 'Proofreading' : mode === 'rewrite' ? 'Rewriting' : 'Summarizing page';
+            window.postMessage({ type: 'PIBBLE_STATUS', message: `⚙️ ${statusMsg}...` }, '*');
             if (window.parent && window.parent !== window) {
-                window.parent.postMessage({ type: 'PIBBLE_STATUS', message: `⚙️ ${mode === 'proofread' ? 'Proofreading' : 'Rewriting'}...` }, '*');
+                window.parent.postMessage({ type: 'PIBBLE_STATUS', message: `⚙️ ${statusMsg}...` }, '*');
             }
 
-            // STEP 2: Send to AI
             console.log(TAG, `🤖 Calling ${mode} API...`);
             const result = await bridgePrompt(selectedText, mode);
 
@@ -164,7 +168,6 @@
             console.log(TAG, result);
             console.log(TAG, `${'─'.repeat(80)}\n`);
 
-            // STEP 3: Send result to overlay
             window.postMessage({ type: 'PIBBLE_RESULT', text: result, mode: mode }, '*');
             if (window.parent && window.parent !== window) {
                 window.parent.postMessage({ type: 'PIBBLE_RESULT', text: result, mode: mode }, '*');
@@ -189,7 +192,6 @@
         }
     }
 
-    // Listen for actions from ANY frame
     window.addEventListener('message', (event: MessageEvent) => {
         const data = event.data;
         if (!data || typeof data !== 'object') return;
@@ -197,7 +199,7 @@
         if (data.type === 'PIBBLE_ACTION') {
             const mode = data.mode;
             console.log(TAG, `📨 📨 📨 Received PIBBLE_ACTION message, mode: ${mode}`);
-            if (mode === 'proofread' || mode === 'rewrite') {
+            if (mode === 'proofread' || mode === 'rewrite' || mode === 'summarize') {
                 handleAIAction(mode);
             } else {
                 console.warn(TAG, `⚠️ Unknown mode: ${mode}`);
