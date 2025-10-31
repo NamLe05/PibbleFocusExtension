@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { IoSend } from 'react-icons/io5';
 import './styles/chatStyles.css';
+import CoinTracker from './CoinTracker';
 
 interface Message {
     id: string;
@@ -375,6 +376,7 @@ export default function Chat() {
 
     return (
         <div className="chat-container">
+            <CoinTracker />
             <div className="chat-header">
                 <div className="avatar">
                     <img src="/assets/pibble_neutral.png" alt="Pibble" />

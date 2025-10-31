@@ -43,7 +43,7 @@ main {
 
 .nav-container {
     position: absolute;
-    top: 425px;
+    top: 435px;
     left: 20px;
     display: flex;
     flex-direction: row;
@@ -54,7 +54,7 @@ main {
     padding: 8px 16px;
     /* Adjusted padding for better spacing */
     border-radius: 20px;
-    height: 50px;
+    height: 40px;
     width: calc(300px - 70px);
     z-index: 10;
     border: 0px;
@@ -65,7 +65,7 @@ main {
 }
 
 .nav-button {
-    width: 30px;
+    width: 12%;
     height: 30px;
     background: transparent;
     border: none;
@@ -91,4 +91,40 @@ main {
     color: white;
     transform: scale(1.3);
     background: rgba(255, 255, 255, 0.1);
+}
+
+
+/* Coin Tracker - Reusable Component */
+.coin-tracker {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: white;
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 2px solid #333;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: transform 0.2s ease;
+}
+
+.coin-tracker:hover {
+    transform: scale(1.05);
+}
+
+.coin-tracker-amount {
+    font-family: 'Varela Round', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: #333;
+    letter-spacing: 0.5px;
+}
+
+.coin-tracker-icon {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
 }

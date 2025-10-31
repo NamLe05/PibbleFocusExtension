@@ -3,6 +3,7 @@ import { usePomodoro } from '../providers/PomodoroProvider'
 import { useTask } from '../providers/TaskProvider'
 import { IoPlay, IoPause, IoRefresh, IoTrash, IoCheckmarkCircle, IoSquareOutline, IoSwapHorizontal } from 'react-icons/io5'
 import './styles/pomodoroStyles.css'
+import CoinTracker from './CoinTracker'
 
 type ViewMode = 'timer' | 'tasks'
 
@@ -14,7 +15,6 @@ export default function Pomodoro() {
     startTimer,
     pauseTimer,
     resetTimer,
-    skipToBreak,
     setExactSession
   } = usePomodoro()
   const { tasks, addTask, toggleTask, removeTask, clearAll } = useTask()
@@ -83,6 +83,7 @@ export default function Pomodoro() {
 
   return (
     <div className="pomodoro-container">
+      <CoinTracker />
       <div className="view-toggle">
         <div className={`toggle-slider ${viewMode === 'tasks' ? 'tasks-active' : ''}`} />
         <button className={`toggle-btn ${viewMode === 'timer' ? 'active' : ''}`} onClick={() => setViewMode('timer')}>

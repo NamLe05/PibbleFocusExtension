@@ -186,7 +186,10 @@
             context: 'This is content from a webpage that needs to be summarized concisely.'
         });
         console.log(TAG, 'Summarizer done, length:', result.length);
-        return result;
+
+        // Add line breaks between bullet points
+        const formatted = result.replace(/\n- /g, '\n\n- ');
+        return formatted;
     }
 
     async function createPromptSession() {

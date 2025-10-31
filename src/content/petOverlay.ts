@@ -42,18 +42,18 @@
     .title::before{content:'✨';font-size:18px}
     .close{border:none;background:rgba(255,255,255,0.15);width:28px;height:28px;border-radius:50%;font-size:18px;cursor:pointer;color:#fff;display:flex;align-items:center;justify-content:center;transition:all .2s;padding:0}
     .close:hover{background:rgba(255,255,255,0.25);transform:rotate(90deg)}
-    .bubble-body{padding:20px}
+    .bubble-body{padding:20px;position:relative}
     .hint{font-size:12px;opacity:0.85;line-height:1.4;background:rgba(255,255,255,0.1);padding:10px 12px;border-radius:8px;text-align:center;margin-bottom:16px}
     .summarize-btn{width:100%;padding:12px 16px;border-radius:12px;border:none;background:rgba(255,255,255,0.95);color:#667eea;cursor:pointer;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s;box-shadow:0 4px 12px rgba(0,0,0,0.1);margin-bottom:12px}
-    .summarize-btn:hover{background:#fff;transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.15)}
-    .summarize-btn:active{transform:translateY(0)}
-    .summarize-btn.loading{pointer-events:none;opacity:0.7}
+    .summarize-btn:hover:not(:disabled){background:#fff;transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.15)}
+    .summarize-btn:active:not(:disabled){transform:translateY(0)}
+    .summarize-btn:disabled{pointer-events:none;opacity:0.6}
     .summarize-icon{font-size:18px}
     .action-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
     .action-btn{padding:14px 16px;border-radius:12px;border:none;background:rgba(255,255,255,0.95);color:#667eea;cursor:pointer;font-size:14px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:6px;transition:all .2s;box-shadow:0 4px 12px rgba(0,0,0,0.1)}
-    .action-btn:hover{background:#fff;transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.15)}
-    .action-btn:active{transform:translateY(0)}
-    .action-btn.loading{pointer-events:none;opacity:0.7}
+    .action-btn:hover:not(:disabled){background:#fff;transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.15)}
+    .action-btn:active:not(:disabled){transform:translateY(0)}
+    .action-btn:disabled{pointer-events:none;opacity:0.6}
     .action-icon{font-size:20px}
     .result-container{display:none;margin-top:16px;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.1)}
     .result-container.show{display:block}
@@ -62,15 +62,14 @@
     .copy-btn{border:none;background:rgba(102,126,234,0.1);color:#667eea;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;transition:all .2s}
     .copy-btn:hover{background:rgba(102,126,234,0.2)}
     .copy-btn:active{transform:scale(0.95)}
-    .result-content{padding:16px;max-height:200px;overflow-y:auto;font-size:13px;line-height:1.6;color:#333;white-space:pre-wrap;word-wrap:break-word}
+    .result-content{padding:16px;max-height:200px;overflow-y:auto;font-size:13px;line-height:1.8;color:#333;white-space:pre-wrap;word-wrap:break-word}
     .result-content::-webkit-scrollbar{width:6px}
     .result-content::-webkit-scrollbar-track{background:rgba(0,0,0,0.05);border-radius:3px}
     .result-content::-webkit-scrollbar-thumb{background:rgba(102,126,234,0.3);border-radius:3px}
     .result-content::-webkit-scrollbar-thumb:hover{background:rgba(102,126,234,0.5)}
-    .status{position:absolute;top:-40px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .2s}
+    .status{position:absolute;top:-40px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .2s;z-index:1000}
     .status.show{opacity:1}
     @keyframes spin{to{transform:rotate(360deg)}}
-    .action-btn.loading .action-icon,.summarize-btn.loading .summarize-icon{animation:spin 1s linear infinite}
   `;
   shadow.appendChild(style);
 
@@ -130,8 +129,10 @@
   const copyBtn = bubble.querySelector('.copy-btn') as HTMLButtonElement;
   const copyText = copyBtn.querySelector('.copy-text') as HTMLSpanElement;
   const summarizeBtn = bubble.querySelector('.summarize-btn') as HTMLButtonElement;
+  const actionButtons = bubble.querySelectorAll('.action-btn') as NodeListOf<HTMLButtonElement>;
 
   let currentResult = '';
+  let isProcessing = false;
 
   function showStatus(msg: string, ms = 2000) {
     statusEl.textContent = msg;
@@ -139,9 +140,25 @@
     setTimeout(() => statusEl.classList.remove('show'), ms);
   }
 
+  function setProcessing(processing: boolean) {
+    isProcessing = processing;
+    summarizeBtn.disabled = processing;
+    actionButtons.forEach(btn => (btn as HTMLButtonElement).disabled = processing);
+  }
+
   function showResult(text: string, mode: string) {
-    currentResult = text;
-    resultContent.textContent = text;
+    // Add extra spacing for summary bullet points
+    let displayText = text;
+    if (mode === 'summarize') {
+      // Ensure double line breaks between bullet points
+      displayText = text
+        .replace(/\n-/g, '\n\n-')
+        .replace(/\n\n\n+/g, '\n\n')  // Clean up triple+ newlines
+        .trim();
+    }
+
+    currentResult = text;  // Keep original for clipboard
+    resultContent.textContent = displayText;
     const titles: Record<string, string> = {
       proofread: 'Proofread Result',
       rewrite: 'Rewrite Result',
@@ -162,13 +179,31 @@
 
     if (e.data?.type === 'PIBBLE_STATUS') {
       const msg = e.data.message;
-      if (msg.startsWith('⚠️') || msg.startsWith('❌')) {
-        hideResult();
+
+      // Check if it's a loading/processing message
+      if (msg.startsWith('⏳') || msg.startsWith('⚙️')) {
+        setProcessing(true);
+        showStatus(msg, 30000); // Keep visible during processing
       }
-      showStatus(msg, 3000);
+      // Check if it's an error or warning
+      else if (msg.startsWith('⚠️') || msg.startsWith('❌')) {
+        setProcessing(false);
+        hideResult();
+        showStatus(msg, 3000);
+      }
+      // Check if it's a success message
+      else if (msg.startsWith('✅')) {
+        setProcessing(false);
+        showStatus(msg, 2000);
+      }
+      // Default: show as status
+      else {
+        showStatus(msg, 3000);
+      }
     }
 
     if (e.data?.type === 'PIBBLE_RESULT') {
+      setProcessing(false);
       const { text, mode } = e.data;
       showResult(text, mode);
     }
@@ -191,33 +226,21 @@
   // Handle summarize button
   summarizeBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    summarizeBtn.classList.add('loading');
-    const icon = summarizeBtn.querySelector('.summarize-icon') as HTMLSpanElement;
-    const orig = icon.textContent;
-    icon.textContent = '⚙️';
+    if (isProcessing) return;
+
     hideResult();
     window.postMessage({ type: 'PIBBLE_ACTION', mode: 'summarize' }, '*');
-    setTimeout(() => {
-      summarizeBtn.classList.remove('loading');
-      icon.textContent = orig;
-    }, 1000);
   });
 
   // Handle proofread/rewrite buttons
-  bubble.querySelectorAll('.action-btn').forEach((btn) => {
+  actionButtons.forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
+      if (isProcessing) return;
+
       const mode = (btn as HTMLElement).dataset.mode;
-      btn.classList.add('loading');
-      const icon = btn.querySelector('.action-icon') as HTMLSpanElement;
-      const orig = icon.textContent;
-      icon.textContent = '⚙️';
       hideResult();
       window.postMessage({ type: 'PIBBLE_ACTION', mode }, '*');
-      setTimeout(() => {
-        btn.classList.remove('loading');
-        icon.textContent = orig;
-      }, 1000);
     });
   });
 
@@ -225,6 +248,8 @@
     e.stopPropagation();
     bubble.setAttribute('data-open', 'false');
     hideResult();
+    setProcessing(false);
+    statusEl.classList.remove('show');
   });
 
   // Dragging logic

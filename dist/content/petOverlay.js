@@ -40,18 +40,18 @@
     .title::before{content:'\u2728';font-size:18px}
     .close{border:none;background:rgba(255,255,255,0.15);width:28px;height:28px;border-radius:50%;font-size:18px;cursor:pointer;color:#fff;display:flex;align-items:center;justify-content:center;transition:all .2s;padding:0}
     .close:hover{background:rgba(255,255,255,0.25);transform:rotate(90deg)}
-    .bubble-body{padding:20px}
+    .bubble-body{padding:20px;position:relative}
     .hint{font-size:12px;opacity:0.85;line-height:1.4;background:rgba(255,255,255,0.1);padding:10px 12px;border-radius:8px;text-align:center;margin-bottom:16px}
     .summarize-btn{width:100%;padding:12px 16px;border-radius:12px;border:none;background:rgba(255,255,255,0.95);color:#667eea;cursor:pointer;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s;box-shadow:0 4px 12px rgba(0,0,0,0.1);margin-bottom:12px}
-    .summarize-btn:hover{background:#fff;transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.15)}
-    .summarize-btn:active{transform:translateY(0)}
-    .summarize-btn.loading{pointer-events:none;opacity:0.7}
+    .summarize-btn:hover:not(:disabled){background:#fff;transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.15)}
+    .summarize-btn:active:not(:disabled){transform:translateY(0)}
+    .summarize-btn:disabled{pointer-events:none;opacity:0.6}
     .summarize-icon{font-size:18px}
     .action-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
     .action-btn{padding:14px 16px;border-radius:12px;border:none;background:rgba(255,255,255,0.95);color:#667eea;cursor:pointer;font-size:14px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:6px;transition:all .2s;box-shadow:0 4px 12px rgba(0,0,0,0.1)}
-    .action-btn:hover{background:#fff;transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.15)}
-    .action-btn:active{transform:translateY(0)}
-    .action-btn.loading{pointer-events:none;opacity:0.7}
+    .action-btn:hover:not(:disabled){background:#fff;transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.15)}
+    .action-btn:active:not(:disabled){transform:translateY(0)}
+    .action-btn:disabled{pointer-events:none;opacity:0.6}
     .action-icon{font-size:20px}
     .result-container{display:none;margin-top:16px;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.1)}
     .result-container.show{display:block}
@@ -60,15 +60,14 @@
     .copy-btn{border:none;background:rgba(102,126,234,0.1);color:#667eea;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;transition:all .2s}
     .copy-btn:hover{background:rgba(102,126,234,0.2)}
     .copy-btn:active{transform:scale(0.95)}
-    .result-content{padding:16px;max-height:200px;overflow-y:auto;font-size:13px;line-height:1.6;color:#333;white-space:pre-wrap;word-wrap:break-word}
+    .result-content{padding:16px;max-height:200px;overflow-y:auto;font-size:13px;line-height:1.8;color:#333;white-space:pre-wrap;word-wrap:break-word}
     .result-content::-webkit-scrollbar{width:6px}
     .result-content::-webkit-scrollbar-track{background:rgba(0,0,0,0.05);border-radius:3px}
     .result-content::-webkit-scrollbar-thumb{background:rgba(102,126,234,0.3);border-radius:3px}
     .result-content::-webkit-scrollbar-thumb:hover{background:rgba(102,126,234,0.5)}
-    .status{position:absolute;top:-40px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .2s}
+    .status{position:absolute;top:-40px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .2s;z-index:1000}
     .status.show{opacity:1}
     @keyframes spin{to{transform:rotate(360deg)}}
-    .action-btn.loading .action-icon,.summarize-btn.loading .summarize-icon{animation:spin 1s linear infinite}
   `;
     shadow.appendChild(style);
     const wrap = document.createElement("div");
@@ -124,15 +123,26 @@
     const copyBtn = bubble.querySelector(".copy-btn");
     const copyText = copyBtn.querySelector(".copy-text");
     const summarizeBtn = bubble.querySelector(".summarize-btn");
+    const actionButtons = bubble.querySelectorAll(".action-btn");
     let currentResult = "";
+    let isProcessing = false;
     function showStatus(msg, ms = 2e3) {
       statusEl.textContent = msg;
       statusEl.classList.add("show");
       setTimeout(() => statusEl.classList.remove("show"), ms);
     }
+    function setProcessing(processing) {
+      isProcessing = processing;
+      summarizeBtn.disabled = processing;
+      actionButtons.forEach((btn) => btn.disabled = processing);
+    }
     function showResult(text, mode) {
+      let displayText = text;
+      if (mode === "summarize") {
+        displayText = text.replace(/\n-/g, "\n\n-").replace(/\n\n\n+/g, "\n\n").trim();
+      }
       currentResult = text;
-      resultContent.textContent = text;
+      resultContent.textContent = displayText;
       const titles = {
         proofread: "Proofread Result",
         rewrite: "Rewrite Result",
@@ -150,12 +160,22 @@
       if (e.source !== window) return;
       if (e.data?.type === "PIBBLE_STATUS") {
         const msg = e.data.message;
-        if (msg.startsWith("\u26A0\uFE0F") || msg.startsWith("\u274C")) {
+        if (msg.startsWith("\u23F3") || msg.startsWith("\u2699\uFE0F")) {
+          setProcessing(true);
+          showStatus(msg, 3e4);
+        } else if (msg.startsWith("\u26A0\uFE0F") || msg.startsWith("\u274C")) {
+          setProcessing(false);
           hideResult();
+          showStatus(msg, 3e3);
+        } else if (msg.startsWith("\u2705")) {
+          setProcessing(false);
+          showStatus(msg, 2e3);
+        } else {
+          showStatus(msg, 3e3);
         }
-        showStatus(msg, 3e3);
       }
       if (e.data?.type === "PIBBLE_RESULT") {
+        setProcessing(false);
         const { text, mode } = e.data;
         showResult(text, mode);
       }
@@ -176,37 +196,25 @@
     });
     summarizeBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      summarizeBtn.classList.add("loading");
-      const icon = summarizeBtn.querySelector(".summarize-icon");
-      const orig = icon.textContent;
-      icon.textContent = "\u2699\uFE0F";
+      if (isProcessing) return;
       hideResult();
       window.postMessage({ type: "PIBBLE_ACTION", mode: "summarize" }, "*");
-      setTimeout(() => {
-        summarizeBtn.classList.remove("loading");
-        icon.textContent = orig;
-      }, 1e3);
     });
-    bubble.querySelectorAll(".action-btn").forEach((btn) => {
+    actionButtons.forEach((btn) => {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
+        if (isProcessing) return;
         const mode = btn.dataset.mode;
-        btn.classList.add("loading");
-        const icon = btn.querySelector(".action-icon");
-        const orig = icon.textContent;
-        icon.textContent = "\u2699\uFE0F";
         hideResult();
         window.postMessage({ type: "PIBBLE_ACTION", mode }, "*");
-        setTimeout(() => {
-          btn.classList.remove("loading");
-          icon.textContent = orig;
-        }, 1e3);
       });
     });
     closeBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       bubble.setAttribute("data-open", "false");
       hideResult();
+      setProcessing(false);
+      statusEl.classList.remove("show");
     });
     let down = false;
     let drag = false;
