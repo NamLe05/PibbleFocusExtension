@@ -1,10 +1,30 @@
+:root {
+    --bg: #FDDDC4FF;
+    --surface-1: #ffffff;
+    --surface-2: #f3f3f3;
+    --text-primary: #1b1b1b;
+    --text-secondary: #4a4a4a;
+    --border: rgba(0,0,0,0.12);
+    --nav-bg: rgba(35, 35, 35, 1);
+}
+
+[data-theme="dark"] {
+    --bg: #141414;
+    --surface-1: #1d1d1d;
+    --surface-2: #262626;
+    --text-primary: #f3f3f3;
+    --text-secondary: #c4c4c4;
+    --border: rgba(255,255,255,0.12);
+    --nav-bg: rgba(20, 20, 20, 1);
+}
+
 body {
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
     margin: 0;
     padding: 0;
     width: 300px;
     min-width: 300px;
-    background-color: #FDDDC4FF;
+    background-color: var(--bg);
     -webkit-app-region: drag;
 }
 
@@ -18,7 +38,7 @@ html {
     height: 500px;
     margin: 0;
     padding: 0;
-    background-color: #FDDDC4FF;
+    background-color: var(--bg);
 }
 
 header h1 {
@@ -34,7 +54,7 @@ main {
 }
 
 .card {
-    background: #fff;
+    background: var(--surface-1);
     border-radius: 12px;
     padding: 10px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -44,23 +64,19 @@ main {
 .nav-container {
     position: absolute;
     top: 425px;
-    left: 20px;
+    left: 12px;
     display: flex;
     flex-direction: row;
-    /* Changed to row for horizontal layout */
-    gap: 8px;
-    /* Reduced gap for horizontal spacing */
-    background: rgba(35, 35, 35, 1);
-    padding: 8px 16px;
-    /* Adjusted padding for better spacing */
+    gap: 0;
+    background: var(--nav-bg);
+    padding: 8px 12px;
     border-radius: 20px;
     height: 50px;
-    width: calc(300px - 70px);
+    width: calc(300px - 24px);
     z-index: 10;
     border: 0px;
     align-items: center;
-    /* Center items vertically */
-    justify-content: center;
+    justify-content: space-between;
     box-shadow: 0px 3px 3px rgba(0, 0, 0, 0.3);
 }
 
@@ -78,8 +94,7 @@ main {
     color: rgba(255, 255, 255, 0.7);
     z-index: 20;
     position: relative;
-    margin: 0 8px;
-    /* Added horizontal margin */
+    margin: 0;
 }
 
 .nav-button:hover {

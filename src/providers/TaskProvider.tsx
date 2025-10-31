@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
+import { useRewards } from './RewardsProvider'
 
 type Task = {
     id: string
@@ -47,6 +48,7 @@ async function setStored<T>(key: string, value: T): Promise<void> {
 
 export function TaskProvider({ children }: { children: React.ReactNode }) {
     const [tasks, setTasks] = useState<Task[]>([])
+    const { earn } = useRewards()
 
     useEffect(() => {
         let mounted = true
@@ -74,9 +76,13 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     }
 
     const toggleTask = (id: string) => {
-        setTasks((prev) =>
-            prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
-        )
+        const target = tasks.find(t => t.id === id)
+        const wasCompleted = target?.completed ?? false
+        setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t)))
+        if (!wasCompleted && target) {
+            // Award a small token bonus for completing a task
+            earn(2, 'task_completed', { id: target.id, title: target.title })
+        }
     }
 
     const removeTask = (id: string) => {

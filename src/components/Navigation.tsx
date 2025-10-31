@@ -1,7 +1,7 @@
 import React from 'react'
-import { IoSettingsOutline, IoChatbubbleEllipsesOutline, IoPawOutline, IoAlarmOutline, IoBrowsersOutline } from 'react-icons/io5'
+import { IoSettingsOutline, IoChatbubbleEllipsesOutline, IoPawOutline, IoAlarmOutline, IoBrowsersOutline, IoGiftOutline } from 'react-icons/io5'
 
-type Tab = 'pet' | 'chat' | 'settings' | 'pomodoro'
+type Tab = 'pet' | 'chat' | 'settings' | 'pomodoro' | 'rewards'
 
 interface NavigationProps {
     activeTab: Tab
@@ -28,6 +28,12 @@ export default function Navigation({ activeTab, setActiveTab }: NavigationProps)
                 onClick={() => setActiveTab('pomodoro')}
             >
                 <IoAlarmOutline size={20} />
+            </button>
+            <button
+                className={`nav-button ${activeTab === 'rewards' ? 'active' : ''}`}
+                onClick={() => setActiveTab('rewards')}
+            >
+                <IoGiftOutline size={20} />
             </button>
             <button
                 className={`nav-button ${activeTab === 'settings' ? 'active' : ''}`}

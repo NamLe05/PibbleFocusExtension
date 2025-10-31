@@ -1,32 +1,4 @@
-"use strict";
-(() => {
-  // src/content/petOverlay.ts
-  (() => {
-    const TAG = "[PetOverlay]";
-    const HOST_ID = "pibble-pet-overlay";
-    const POS_KEY = "pibble-pet-overlay-pos";
-    const existing = document.getElementById(HOST_ID);
-    if (existing) {
-      existing.remove();
-      return;
-    }
-    const host = document.createElement("div");
-    host.id = HOST_ID;
-    host.style.cssText = `position:fixed;right:20px;bottom:20px;width:120px;height:120px;z-index:2147483647;pointer-events:auto;background:transparent;`;
-    try {
-      const saved = localStorage.getItem(POS_KEY);
-      if (saved) {
-        const { x, y } = JSON.parse(saved);
-        host.style.left = `${x}px`;
-        host.style.top = `${y}px`;
-        host.style.right = "auto";
-        host.style.bottom = "auto";
-      }
-    } catch {
-    }
-    const shadow = host.attachShadow({ mode: "open" });
-    const style = document.createElement("style");
-    style.textContent = `
+(()=>{const y="pibble-pet-overlay",w="pibble-pet-overlay-pos",v=document.getElementById(y);if(v){v.remove();return}const n=document.createElement("div");n.id=y,n.style.cssText="position:fixed;right:20px;bottom:20px;width:120px;height:120px;z-index:2147483647;pointer-events:auto;background:transparent;";try{const t=localStorage.getItem(w);if(t){const{x:e,y:o}=JSON.parse(t);n.style.left=`${e}px`,n.style.top=`${o}px`,n.style.right="auto",n.style.bottom="auto"}}catch{}const k=n.attachShadow({mode:"open"}),C=document.createElement("style");C.textContent=`
     :host{all:initial}*{box-sizing:border-box}
     .wrap{position:relative;width:100%;height:100%}
     .pet{position:absolute;inset:auto 0 0 0;margin:auto;width:100%;height:auto;cursor:grab;user-select:none;-webkit-user-drag:none;filter:drop-shadow(0 8px 18px rgba(0,0,0,0.25));transition:transform .12s ease;touch-action:none;transform-origin:bottom center;animation:rock 3s ease-in-out infinite}
@@ -37,7 +9,7 @@
     .bubble::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:10px solid transparent;border-top-color:#764ba2}
     .bubble-header{padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:space-between}
     .title{font-weight:600;font-size:15px;margin:0;display:flex;align-items:center;gap:8px}
-    .title::before{content:'\u2728';font-size:18px}
+    .title::before{content:'✨';font-size:18px}
     .close{border:none;background:rgba(255,255,255,0.15);width:28px;height:28px;border-radius:50%;font-size:18px;cursor:pointer;color:#fff;display:flex;align-items:center;justify-content:center;transition:all .2s;padding:0}
     .close:hover{background:rgba(255,255,255,0.25);transform:rotate(90deg)}
     .bubble-body{padding:20px}
@@ -69,36 +41,24 @@
     .status.show{opacity:1}
     @keyframes spin{to{transform:rotate(360deg)}}
     .action-btn.loading .action-icon,.summarize-btn.loading .summarize-icon{animation:spin 1s linear infinite}
-  `;
-    shadow.appendChild(style);
-    const wrap = document.createElement("div");
-    wrap.className = "wrap";
-    shadow.appendChild(wrap);
-    const img = document.createElement("img");
-    img.className = "pet";
-    img.alt = "Pibble";
-    img.src = chrome.runtime.getURL("assets/pibble_neutral.png");
-    wrap.appendChild(img);
-    const bubble = document.createElement("div");
-    bubble.className = "bubble";
-    bubble.innerHTML = `
+  `,k.appendChild(C);const l=document.createElement("div");l.className="wrap",k.appendChild(l);const s=document.createElement("img");s.className="pet",s.alt="Pibble",s.src=chrome.runtime.getURL("assets/pibble_neutral.png"),l.appendChild(s);const a=document.createElement("div");a.className="bubble",a.innerHTML=`
     <div class="bubble-header">
       <div class="title">AI Writing Assistant</div>
-      <button class="close" title="Close">\xD7</button>
+      <button class="close" title="Close">×</button>
     </div>
     <div class="bubble-body">
       <div class="hint">Copy text or click Summarize for page summary</div>
       <button class="summarize-btn" data-mode="summarize">
-        <span class="summarize-icon">\u{1F4C4}</span>
+        <span class="summarize-icon">📄</span>
         <span>Summarize Page</span>
       </button>
       <div class="action-grid">
         <button class="action-btn" data-mode="proofread">
-          <span class="action-icon">\u{1F4DD}</span>
+          <span class="action-icon">📝</span>
           <span>Proofread</span>
         </button>
         <button class="action-btn" data-mode="rewrite">
-          <span class="action-icon">\u270D\uFE0F</span>
+          <span class="action-icon">✍️</span>
           <span>Rewrite</span>
         </button>
       </div>
@@ -106,7 +66,7 @@
         <div class="result-header">
           <div class="result-title">Result</div>
           <button class="copy-btn">
-            <span>\u{1F4CB}</span>
+            <span>📋</span>
             <span class="copy-text">Copy</span>
           </button>
         </div>
@@ -114,149 +74,4 @@
       </div>
     </div>
     <div class="status"></div>
-  `;
-    wrap.appendChild(bubble);
-    const statusEl = bubble.querySelector(".status");
-    const closeBtn = bubble.querySelector(".close");
-    const resultContainer = bubble.querySelector(".result-container");
-    const resultContent = bubble.querySelector(".result-content");
-    const resultTitle = bubble.querySelector(".result-title");
-    const copyBtn = bubble.querySelector(".copy-btn");
-    const copyText = copyBtn.querySelector(".copy-text");
-    const summarizeBtn = bubble.querySelector(".summarize-btn");
-    let currentResult = "";
-    function showStatus(msg, ms = 2e3) {
-      statusEl.textContent = msg;
-      statusEl.classList.add("show");
-      setTimeout(() => statusEl.classList.remove("show"), ms);
-    }
-    function showResult(text, mode) {
-      currentResult = text;
-      resultContent.textContent = text;
-      const titles = {
-        proofread: "Proofread Result",
-        rewrite: "Rewrite Result",
-        summarize: "Page Summary"
-      };
-      resultTitle.textContent = titles[mode] || "Result";
-      resultContainer.classList.add("show");
-      copyText.textContent = "Copy";
-    }
-    function hideResult() {
-      resultContainer.classList.remove("show");
-      currentResult = "";
-    }
-    window.addEventListener("message", (e) => {
-      if (e.source !== window) return;
-      if (e.data?.type === "PIBBLE_STATUS") {
-        const msg = e.data.message;
-        if (msg.startsWith("\u26A0\uFE0F") || msg.startsWith("\u274C")) {
-          hideResult();
-        }
-        showStatus(msg, 3e3);
-      }
-      if (e.data?.type === "PIBBLE_RESULT") {
-        const { text, mode } = e.data;
-        showResult(text, mode);
-      }
-    });
-    copyBtn.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      if (!currentResult) return;
-      try {
-        await navigator.clipboard.writeText(currentResult);
-        copyText.textContent = "\u2713 Copied!";
-        showStatus("\u2705 Copied to clipboard!", 2e3);
-        setTimeout(() => {
-          copyText.textContent = "Copy";
-        }, 2e3);
-      } catch (err) {
-        showStatus("\u274C Copy failed", 2e3);
-      }
-    });
-    summarizeBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      summarizeBtn.classList.add("loading");
-      const icon = summarizeBtn.querySelector(".summarize-icon");
-      const orig = icon.textContent;
-      icon.textContent = "\u2699\uFE0F";
-      hideResult();
-      window.postMessage({ type: "PIBBLE_ACTION", mode: "summarize" }, "*");
-      setTimeout(() => {
-        summarizeBtn.classList.remove("loading");
-        icon.textContent = orig;
-      }, 1e3);
-    });
-    bubble.querySelectorAll(".action-btn").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const mode = btn.dataset.mode;
-        btn.classList.add("loading");
-        const icon = btn.querySelector(".action-icon");
-        const orig = icon.textContent;
-        icon.textContent = "\u2699\uFE0F";
-        hideResult();
-        window.postMessage({ type: "PIBBLE_ACTION", mode }, "*");
-        setTimeout(() => {
-          btn.classList.remove("loading");
-          icon.textContent = orig;
-        }, 1e3);
-      });
-    });
-    closeBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      bubble.setAttribute("data-open", "false");
-      hideResult();
-    });
-    let down = false;
-    let drag = false;
-    let sx = 0;
-    let sy = 0;
-    let ox = 0;
-    let oy = 0;
-    const THRESH = 5;
-    const clamp = (x, y) => {
-      const mx = Math.max(0, window.innerWidth - host.offsetWidth);
-      const my = Math.max(0, window.innerHeight - host.offsetHeight);
-      return { x: Math.min(Math.max(0, x), mx), y: Math.min(Math.max(0, y), my) };
-    };
-    img.addEventListener("pointerdown", (e) => {
-      down = true;
-      drag = false;
-      sx = e.clientX;
-      sy = e.clientY;
-      img.setPointerCapture?.(e.pointerId);
-      const r = host.getBoundingClientRect();
-      ox = sx - r.left;
-      oy = sy - r.top;
-    });
-    window.addEventListener("pointermove", (e) => {
-      if (!down) return;
-      const dx = e.clientX - sx;
-      const dy = e.clientY - sy;
-      if (!drag && Math.hypot(dx, dy) > THRESH) drag = true;
-      if (!drag) return;
-      const next = clamp(e.clientX - ox, e.clientY - oy);
-      host.style.left = `${next.x}px`;
-      host.style.top = `${next.y}px`;
-      host.style.right = "auto";
-      host.style.bottom = "auto";
-    });
-    window.addEventListener("pointerup", () => {
-      if (!down) return;
-      down = false;
-      if (drag) {
-        drag = false;
-        try {
-          const r = host.getBoundingClientRect();
-          localStorage.setItem(POS_KEY, JSON.stringify({ x: r.left, y: r.top }));
-        } catch {
-        }
-      } else {
-        const open = bubble.getAttribute("data-open") === "true";
-        bubble.setAttribute("data-open", open ? "false" : "true");
-      }
-    });
-    document.documentElement.appendChild(host);
-  })();
-})();
+  `,l.appendChild(a);const b=a.querySelector(".status"),T=a.querySelector(".close"),z=a.querySelector(".result-container"),B=a.querySelector(".result-content"),P=a.querySelector(".result-title"),S=a.querySelector(".copy-btn"),m=S.querySelector(".copy-text"),c=a.querySelector(".summarize-btn");let d="";function g(t,e=2e3){b.textContent=t,b.classList.add("show"),setTimeout(()=>b.classList.remove("show"),e)}function R(t,e){d=t,B.textContent=t;const o={proofread:"Proofread Result",rewrite:"Rewrite Result",summarize:"Page Summary"};P.textContent=o[e]||"Result",z.classList.add("show"),m.textContent="Copy"}function p(){z.classList.remove("show"),d=""}window.addEventListener("message",t=>{var e,o;if(t.source===window){if(((e=t.data)==null?void 0:e.type)==="PIBBLE_STATUS"){const r=t.data.message;(r.startsWith("⚠️")||r.startsWith("❌"))&&p(),g(r,3e3)}if(((o=t.data)==null?void 0:o.type)==="PIBBLE_RESULT"){const{text:r,mode:h}=t.data;R(r,h)}}}),S.addEventListener("click",async t=>{if(t.stopPropagation(),!!d)try{await navigator.clipboard.writeText(d),m.textContent="✓ Copied!",g("✅ Copied to clipboard!",2e3),setTimeout(()=>{m.textContent="Copy"},2e3)}catch{g("❌ Copy failed",2e3)}}),c.addEventListener("click",t=>{t.stopPropagation(),c.classList.add("loading");const e=c.querySelector(".summarize-icon"),o=e.textContent;e.textContent="⚙️",p(),window.postMessage({type:"PIBBLE_ACTION",mode:"summarize"},"*"),setTimeout(()=>{c.classList.remove("loading"),e.textContent=o},1e3)}),a.querySelectorAll(".action-btn").forEach(t=>{t.addEventListener("click",e=>{e.stopPropagation();const o=t.dataset.mode;t.classList.add("loading");const r=t.querySelector(".action-icon"),h=r.textContent;r.textContent="⚙️",p(),window.postMessage({type:"PIBBLE_ACTION",mode:o},"*"),setTimeout(()=>{t.classList.remove("loading"),r.textContent=h},1e3)})}),T.addEventListener("click",t=>{t.stopPropagation(),a.setAttribute("data-open","false"),p()});let u=!1,i=!1,x=0,f=0,E=0,L=0;const I=5,q=(t,e)=>{const o=Math.max(0,window.innerWidth-n.offsetWidth),r=Math.max(0,window.innerHeight-n.offsetHeight);return{x:Math.min(Math.max(0,t),o),y:Math.min(Math.max(0,e),r)}};s.addEventListener("pointerdown",t=>{var o;u=!0,i=!1,x=t.clientX,f=t.clientY,(o=s.setPointerCapture)==null||o.call(s,t.pointerId);const e=n.getBoundingClientRect();E=x-e.left,L=f-e.top}),window.addEventListener("pointermove",t=>{if(!u)return;const e=t.clientX-x,o=t.clientY-f;if(!i&&Math.hypot(e,o)>I&&(i=!0),!i)return;const r=q(t.clientX-E,t.clientY-L);n.style.left=`${r.x}px`,n.style.top=`${r.y}px`,n.style.right="auto",n.style.bottom="auto"}),window.addEventListener("pointerup",()=>{if(u)if(u=!1,i){i=!1;try{const t=n.getBoundingClientRect();localStorage.setItem(w,JSON.stringify({x:t.left,y:t.top}))}catch{}}else{const t=a.getAttribute("data-open")==="true";a.setAttribute("data-open",t?"false":"true")}}),document.documentElement.appendChild(n)})();

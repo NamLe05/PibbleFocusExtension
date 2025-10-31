@@ -17,7 +17,8 @@
     "storage",
     "clipboardWrite",
     "clipboardRead",
-    "offscreen"
+    "offscreen",
+    "notifications"
   ],
   "host_permissions": [
     "<all_urls>"

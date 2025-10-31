@@ -6,9 +6,13 @@ import Pet from './components/Pet'
 import Chat from './components/Chat'
 import Pomodoro from './components/Pomodoro'
 import Navigation from './components/Navigation'
+import Rewards from './components/Rewards'
+import Settings from './components/Settings'
+import { SettingsProvider } from './providers/SettingsProvider'
+import { RewardsProvider } from './providers/RewardsProvider'
 import './styles.css'
 
-type Tab = 'pet' | 'chat' | 'settings' | 'pomodoro'
+type Tab = 'pet' | 'chat' | 'settings' | 'pomodoro' | 'rewards'
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('pet')
@@ -21,23 +25,29 @@ export default function App() {
         return <Chat />
       case 'pomodoro':
         return <Pomodoro />
+      case 'rewards':
+        return <Rewards />
       case 'settings':
-        return <div>Settings Coming Soon</div>
+        return <Settings />
     }
   }
 
   return (
     <div className="app">
-      <PetProvider>
-        <PomodoroProvider>
-          <TaskProvider>
-            <main>
-              {renderContent()}
-            </main>
-            <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
-          </TaskProvider>
-        </PomodoroProvider>
-      </PetProvider>
+      <SettingsProvider>
+        <RewardsProvider>
+          <PetProvider>
+            <PomodoroProvider>
+              <TaskProvider>
+                <main>
+                  {renderContent()}
+                </main>
+                <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
+              </TaskProvider>
+            </PomodoroProvider>
+          </PetProvider>
+        </RewardsProvider>
+      </SettingsProvider>
     </div>
   )
 }

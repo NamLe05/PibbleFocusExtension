@@ -1,4 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react'
+import { useSettings } from './SettingsProvider'
+import { createNotification } from '../utils/notifications'
+import { useRewards } from './RewardsProvider'
 
 type PetState = 'neutral' | 'happy' | 'sad' | 'bathing' | 'eating'
 
@@ -64,6 +67,8 @@ async function setStored<T>(key: string, value: T): Promise<void> {
 }
 
 export function PetProvider({ children }: { children: React.ReactNode }) {
+    const { settings } = useSettings()
+    const { earn } = useRewards()
     const [pet, setPet] = useState<PetData>({
         state: 'neutral',
         name: 'Pibble',
@@ -73,6 +78,8 @@ export function PetProvider({ children }: { children: React.ReactNode }) {
         lastPetted: new Date().toISOString(),
         experience: 0
     })
+    const prevStateRef = useRef<PetData | null>(null)
+    const prevLevelRef = useRef<number>(1)
 
     // Load saved state
     useEffect(() => {
@@ -99,17 +106,40 @@ export function PetProvider({ children }: { children: React.ReactNode }) {
             setPet(prev => {
                 const happinessLevel = Math.max(0, prev.happinessLevel - HAPPINESS_DECAY_RATE * deltaHours)
                 const hungerLevel = Math.max(0, prev.hungerLevel - HUNGER_DECAY_RATE * deltaHours)
-                return {
+                const next: PetData = {
                     ...prev,
                     happinessLevel,
                     hungerLevel,
                     state: happinessLevel < 30 || hungerLevel < 30 ? 'sad' : prev.state
                 }
+                // Notify if transitioning into sad
+                if (settings.notifications.petSadReminders && prev.state !== 'sad' && next.state === 'sad') {
+                    createNotification('pibble_is_sad', 'Pibble is feeling sad', 'Spend a moment to feed or pet Pibble!')
+                }
+                return next
             })
         }
         const id = setInterval(tick, 60000)
         return () => clearInterval(id)
-    }, [])
+    }, [settings.notifications.petSadReminders])
+
+    // Detect level ups and award tokens
+    useEffect(() => {
+        const levelNow = calculateLevel(pet.experience)
+        if (levelNow > prevLevelRef.current) {
+            const levelsGained = levelNow - prevLevelRef.current
+            prevLevelRef.current = levelNow
+            // Award 5 tokens per level gained
+            earn(5 * levelsGained, 'pet_level_up', { level: levelNow })
+            if (settings.notifications.rewardUnlocks) {
+                createNotification('pibble_level_up', 'Pibble leveled up!', `Level ${levelNow} reached!`)
+            }
+        }
+        // initialize ref on first run
+        if (prevLevelRef.current < 1) {
+            prevLevelRef.current = levelNow
+        }
+    }, [pet.experience])
 
     const updateHappiness = (amount: number) => {
         setPet(prev => ({

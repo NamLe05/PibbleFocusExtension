@@ -1,4 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react'
+import { useSettings } from './SettingsProvider'
+import { createNotification } from '../utils/notifications'
+import { useRewards } from './RewardsProvider'
 
 type TimerState = 'idle' | 'focus' | 'break'
 
@@ -52,6 +55,8 @@ async function setStored<T>(key: string, value: T): Promise<void> {
 }
 
 export function PomodoroProvider({ children }: { children: React.ReactNode }) {
+    const { settings } = useSettings()
+    const { earn } = useRewards()
     const [pomodoro, setPomodoro] = useState<PomodoroData>({
         state: 'idle',
         focusDuration: 25,
@@ -85,6 +90,15 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
                 setPomodoro((prev) => {
                     if (prev.timeRemaining <= 1) {
                         if (prev.state === 'focus') {
+                            // Earn tokens on focus completion
+                            if (settings.rewardsEnabled) {
+                                const sessionMinutes = prev.focusDuration
+                                const tokens = Math.max(1, Math.round(sessionMinutes / 5)) // ~1 per 5 minutes
+                                earn(tokens, 'focus_session_complete', { minutes: sessionMinutes })
+                            }
+                            if (settings.notifications.timerAlerts) {
+                                createNotification('pibble_timer_focus_done', 'Focus complete', 'Great work! Time for a break.')
+                            }
                             return {
                                 ...prev,
                                 state: 'break',
@@ -92,6 +106,9 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
                                 isRunning: false
                             }
                         } else if (prev.state === 'break') {
+                            if (settings.notifications.timerAlerts) {
+                                createNotification('pibble_timer_break_done', 'Break ended', 'Ready to start your next focus session?')
+                            }
                             return {
                                 ...prev,
                                 state: 'idle',
