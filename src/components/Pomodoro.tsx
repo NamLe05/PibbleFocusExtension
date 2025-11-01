@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { usePomodoro } from '../providers/PomodoroProvider'
 import { useTask } from '../providers/TaskProvider'
+import { useUser } from '../providers/UserProvider'
 import { IoPlay, IoPause, IoRefresh, IoTrash, IoCheckmarkCircle, IoSquareOutline, IoSwapHorizontal } from 'react-icons/io5'
 import './styles/pomodoroStyles.css'
 import CoinTracker from './CoinTracker'
@@ -18,6 +19,7 @@ export default function Pomodoro() {
     setExactSession
   } = usePomodoro()
   const { tasks, addTask, toggleTask, removeTask, clearAll } = useTask()
+  const { addCoins } = useUser()
   const [viewMode, setViewMode] = useState<ViewMode>('timer')
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [editingFocus, setEditingFocus] = useState(false)
@@ -30,6 +32,36 @@ export default function Pomodoro() {
     focus: pomodoro.focusDuration * 60,
     break: pomodoro.breakDuration * 60
   })
+
+  // --- Focus time accumulation for coin rewards ---
+  const [focusAccum, setFocusAccum] = useState(0)
+  const prevState = useRef(pomodoro.state)
+  const prevTime = useRef(pomodoro.timeRemaining)
+
+  useEffect(() => {
+    // Only count focus time, accumulate seconds
+    if (pomodoro.state === 'focus' && pomodoro.isRunning) {
+      const diff = prevTime.current - pomodoro.timeRemaining
+      if (diff > 0) {
+        setFocusAccum(acc => acc + diff)
+      }
+    }
+    // When leaving focus, reset prevTime
+    if (pomodoro.state !== prevState.current) {
+      prevTime.current = pomodoro.timeRemaining
+    }
+    prevState.current = pomodoro.state
+    prevTime.current = pomodoro.timeRemaining
+  }, [pomodoro.state, pomodoro.timeRemaining, pomodoro.isRunning])
+
+  useEffect(() => {
+    // If accumulated focus time >= 20 min (1200s), award coins and reset accumulator
+    if (focusAccum >= 1200) {
+      addCoins(10)
+      setFocusAccum(acc => acc - 1200)
+    }
+  }, [focusAccum, addCoins])
+  // --- End focus time accumulation ---
 
   useEffect(() => {
     if (pomodoro.state === 'focus' || pomodoro.state === 'break') {
@@ -204,6 +236,7 @@ export default function Pomodoro() {
           </>
         ) : (
           <div className="task-management">
+            <CoinTracker />
             <div className="task-input-section">
               <h4>Add New Task</h4>
               <div className="task-input-container">

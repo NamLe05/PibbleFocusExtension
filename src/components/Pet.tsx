@@ -12,13 +12,17 @@ export default function Pet() {
 
   const feedTimerRef = useRef<number | null>(null)
   const bathTimerRef = useRef<number | null>(null)
+  const happyTimerRef = useRef<number | null>(null)
   const [view, setView] = useState<'stats' | 'room'>('stats')
   const [errorMessage, setErrorMessage] = useState<string>('')
+  const [pendingHappy, setPendingHappy] = useState(false)
+  const [prevLevel, setPrevLevel] = useState<number>(() => calculateLevel(experience))
 
   useEffect(() => {
     return () => {
       if (feedTimerRef.current) clearTimeout(feedTimerRef.current)
       if (bathTimerRef.current) clearTimeout(bathTimerRef.current)
+      if (happyTimerRef.current) clearTimeout(happyTimerRef.current)
     }
   }, [])
 
@@ -27,20 +31,48 @@ export default function Pet() {
     setTimeout(() => setErrorMessage(''), 3000)
   }
 
+  // --- Level up detection and happy animation ---
+  useEffect(() => {
+    const currentLevel = calculateLevel(experience)
+    if (currentLevel > prevLevel) {
+      // If currently animating (eating/bathing), queue happy animation
+      if (state === 'eating' || state === 'bathing') {
+        setPendingHappy(true)
+      } else {
+        playHappyAnimation()
+      }
+    }
+    setPrevLevel(currentLevel)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [experience])
+
+  // When eating/bathing animation ends, play happy if pending
+  useEffect(() => {
+    if ((state === 'neutral' || state === 'sad') && pendingHappy) {
+      setPendingHappy(false)
+      playHappyAnimation()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state])
+
+  const playHappyAnimation = () => {
+    setState('happy')
+    if (happyTimerRef.current) clearTimeout(happyTimerRef.current)
+    happyTimerRef.current = window.setTimeout(() => {
+      setState('neutral')
+      happyTimerRef.current = null
+    }, 2000)
+  }
+  // --- End level up logic ---
+
   const handleFeed = () => {
     if (!spendCoins(5)) {
       showError('Not enough coins! Need 5 coins.')
       return
     }
 
-    const switching = state !== 'happy'
-    if (switching) {
-      if (bathTimerRef.current) {
-        clearTimeout(bathTimerRef.current)
-        bathTimerRef.current = null
-      }
-      setState('happy')
-    }
+    // Set to 'eating' state and animate
+    setState('eating')
     setPet(p => ({
       ...p,
       lastFed: new Date().toISOString(),
@@ -51,9 +83,10 @@ export default function Pet() {
     }))
     if (feedTimerRef.current) clearTimeout(feedTimerRef.current)
     feedTimerRef.current = window.setTimeout(() => {
-      setState('neutral')
+      // If a happy animation is pending (from level up), let the effect handle it
+      if (!pendingHappy) setState('neutral')
       feedTimerRef.current = null
-    }, 3000)
+    }, 2000)
   }
 
   const handleBath = () => {
@@ -62,14 +95,7 @@ export default function Pet() {
       return
     }
 
-    const switching = state !== 'bathing'
-    if (switching) {
-      if (feedTimerRef.current) {
-        clearTimeout(feedTimerRef.current)
-        feedTimerRef.current = null
-      }
-      setState('bathing')
-    }
+    setState('bathing')
     setPet(p => ({
       ...p,
       lastPetted: new Date().toISOString(),
@@ -78,9 +104,10 @@ export default function Pet() {
     }))
     if (bathTimerRef.current) clearTimeout(bathTimerRef.current)
     bathTimerRef.current = window.setTimeout(() => {
-      setState('neutral')
+      // If a happy animation is pending (from level up), let the effect handle it
+      if (!pendingHappy) setState('neutral')
       bathTimerRef.current = null
-    }, 3000)
+    }, 2000)
   }
 
   const getExpForLevel = (lvl: number): number => {
@@ -100,7 +127,8 @@ export default function Pet() {
 
   const rooms = [
     { id: 'room', name: 'Default', image: '/assets/room.png', cost: 0 },
-    { id: 'pink-room', name: 'Pink', image: '/assets/pink-room.png', cost: 50 },
+    { id: 'blue-room', name: 'Blue', image: '/assets/blue-room.png', cost: 50 },
+    { id: 'pink-room', name: 'Pink', image: '/assets/pink-room.png', cost: 100 },
     { id: 'space-room', name: 'Space', image: '/assets/space-room.png', cost: 150 }
   ]
 
@@ -139,9 +167,7 @@ export default function Pet() {
       )}
 
       <div className="pet-header">
-        <div className="pet-name">
-          {name} lvl.{level}
-        </div>
+        <div className="pet-name">lvl.{level}</div>
       </div>
       <div className="pet-room" style={{ backgroundImage: `url('${rooms.find(r => r.id === selectedRoom)?.image}')` }}>
         <img

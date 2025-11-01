@@ -10,6 +10,7 @@ type PetData = {
     lastFed: string // ISO date string
     lastPetted: string // ISO date string
     experience: number
+    lastUpdated?: string // <-- add this
 }
 
 type PetContextValue = {
@@ -23,8 +24,8 @@ type PetContextValue = {
 const PetContext = createContext<PetContextValue | null>(null)
 const STORAGE_KEY = 'petState'
 
-const HAPPINESS_DECAY_RATE = 15 // Amount happiness decreases per hour
-const HUNGER_DECAY_RATE = 20 // Amount hunger decreases per hour
+const HAPPINESS_DECAY_RATE = 10 // Amount happiness decreases per hour
+const HUNGER_DECAY_RATE = 15 // Amount hunger decreases per hour
 
 const calculateLevel = (exp: number): number => {
     if (exp < 50) return 1
@@ -79,14 +80,27 @@ export function PetProvider({ children }: { children: React.ReactNode }) {
         let mounted = true
             ; (async () => {
                 const stored = await getStored<PetData>(STORAGE_KEY)
-                if (mounted && stored) setPet(stored)
+                if (mounted && stored) {
+                    const now = Date.now()
+                    const last = stored.lastUpdated ? new Date(stored.lastUpdated).getTime() : now
+                    const deltaHours = (now - last) / (1000 * 60 * 60)
+                    let happinessLevel = Math.max(0, stored.happinessLevel - HAPPINESS_DECAY_RATE * deltaHours)
+                    let hungerLevel = Math.max(0, stored.hungerLevel - HUNGER_DECAY_RATE * deltaHours)
+                    setPet({
+                        ...stored,
+                        happinessLevel,
+                        hungerLevel,
+                        state: happinessLevel < 30 || hungerLevel < 30 ? 'sad' : 'neutral'
+                    })
+                }
             })()
         return () => { mounted = false }
     }, [])
 
+
     // Save state changes
     useEffect(() => {
-        setStored(STORAGE_KEY, pet)
+        setStored(STORAGE_KEY, { ...pet, lastUpdated: new Date().toISOString() })
     }, [pet])
 
     // Happiness and hunger decay over time
@@ -116,7 +130,7 @@ export function PetProvider({ children }: { children: React.ReactNode }) {
             ...prev,
             happinessLevel: Math.min(100, Math.max(0, prev.happinessLevel + amount)),
             lastPetted: new Date().toISOString(),
-            state: amount > 0 ? 'happy' : prev.state
+            state: amount > 0 ? 'neutral' : prev.state
         }))
     }
 

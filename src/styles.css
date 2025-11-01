@@ -97,16 +97,16 @@ main {
 /* Coin Tracker - Reusable Component */
 .coin-tracker {
     position: absolute;
-    top: 16px;
-    right: 16px;
+    top: 8px;
+    right: 8px;
     z-index: 20;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     background: white;
-    padding: 6px 12px;
+    padding: 3px 6px;
     border-radius: 20px;
-    border: 2px solid #333;
+    border: 1.5px solid #333;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     transition: transform 0.2s ease;
 }
@@ -127,4 +127,50 @@ main {
     width: 20px;
     height: 20px;
     object-fit: contain;
+}
+
+/* Coin Delta Emit Animation */
+.coin-delta-emit {
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    font-size: 15px;
+    font-weight: 700;
+    color: #27ae60;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+    pointer-events: none;
+    opacity: 0;
+    animation: coin-delta-float 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    z-index: 100;
+}
+
+.coin-delta-emit img {
+    width: 18px;
+    height: 18px;
+    margin-left: 2px;
+}
+
+@keyframes coin-delta-float {
+    0% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(0);
+    }
+
+    10% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(8px);
+    }
+
+    80% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(28px);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(40px);
+    }
 }

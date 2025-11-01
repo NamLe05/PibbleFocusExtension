@@ -58,4 +58,15 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     });
     return true;
   }
+
+  if (msg?.type === 'AWARD_COINS') {
+    chrome.storage.local.get(['user'], (data) => {
+      const user = data.user || { coins: 0 }
+      user.coins = (user.coins || 0) + (msg.amount || 0)
+      chrome.storage.local.set({ user }, () => {
+        sendResponse({ ok: true })
+      })
+    })
+    return true // <-- Important for async sendResponse
+  }
 });

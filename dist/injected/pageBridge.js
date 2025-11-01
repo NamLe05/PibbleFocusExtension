@@ -69,7 +69,14 @@
 
         console.log(TAG, 'Using Proofreader API...');
         const result = await proofreaderSession.proofread(text);
-        const correctedText = result.corrected || result || text;
+
+        let correctedText = text;
+        if (result && typeof result === 'object' && typeof result.corrected === 'string') {
+            correctedText = result.corrected;
+        } else if (typeof result === 'string') {
+            correctedText = result;
+        }
+
         console.log(TAG, 'Proofreader done, length:', correctedText.length);
         return correctedText;
     }

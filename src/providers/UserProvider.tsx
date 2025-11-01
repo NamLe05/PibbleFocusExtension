@@ -36,13 +36,33 @@ export function UserProvider({ children }: { children: ReactNode }) {
         return defaultUserState
     })
 
+    // Sync coins from chrome.storage.local on mount
+    useEffect(() => {
+        chrome.storage.local.get(['user'], (data) => {
+            if (data.user && typeof data.user.coins === 'number') {
+                setUser((prev) => ({ ...prev, coins: data.user.coins }))
+            }
+        })
+    }, [])
+
     useEffect(() => {
         try {
             localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user))
+            chrome.storage.local.set({ user })
         } catch (error) {
             console.error('Failed to save user state:', error)
         }
     }, [user])
+
+    useEffect(() => {
+        function handleStorageChange(changes: any, area: string) {
+            if (area === 'local' && changes.user) {
+                setUser(changes.user.newValue)
+            }
+        }
+        chrome.storage.onChanged.addListener(handleStorageChange)
+        return () => chrome.storage.onChanged.removeListener(handleStorageChange)
+    }, [])
 
     const addCoins = (amount: number) => {
         setUser(prev => ({

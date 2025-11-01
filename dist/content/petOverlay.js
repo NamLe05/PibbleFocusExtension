@@ -82,7 +82,7 @@
     bubble.className = "bubble";
     bubble.innerHTML = `
     <div class="bubble-header">
-      <div class="title">AI Writing Assistant</div>
+      <div class="title">AI Assistant</div>
       <button class="close" title="Close">\xD7</button>
     </div>
     <div class="bubble-body">
@@ -197,6 +197,7 @@
     summarizeBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       if (isProcessing) return;
+      awardCoins(5);
       hideResult();
       window.postMessage({ type: "PIBBLE_ACTION", mode: "summarize" }, "*");
     });
@@ -205,6 +206,9 @@
         e.stopPropagation();
         if (isProcessing) return;
         const mode = btn.dataset.mode;
+        if (mode === "proofread" || mode === "rewrite") {
+          awardCoins(1);
+        }
         hideResult();
         window.postMessage({ type: "PIBBLE_ACTION", mode }, "*");
       });
@@ -266,5 +270,8 @@
       }
     });
     document.documentElement.appendChild(host);
+    function awardCoins(amount) {
+      chrome.runtime.sendMessage({ type: "AWARD_COINS", amount });
+    }
   })();
 })();
