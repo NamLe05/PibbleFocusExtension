@@ -31,11 +31,9 @@ export default function Pet() {
     setTimeout(() => setErrorMessage(''), 3000)
   }
 
-  // --- Level up detection and happy animation ---
   useEffect(() => {
     const currentLevel = calculateLevel(experience)
     if (currentLevel > prevLevel) {
-      // If currently animating (eating/bathing), queue happy animation
       if (state === 'eating' || state === 'bathing') {
         setPendingHappy(true)
       } else {
@@ -46,7 +44,6 @@ export default function Pet() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [experience])
 
-  // When eating/bathing animation ends, play happy if pending
   useEffect(() => {
     if ((state === 'neutral' || state === 'sad') && pendingHappy) {
       setPendingHappy(false)
@@ -63,7 +60,6 @@ export default function Pet() {
       happyTimerRef.current = null
     }, 2000)
   }
-  // --- End level up logic ---
 
   const handleFeed = () => {
     if (!spendCoins(5)) {
@@ -71,7 +67,6 @@ export default function Pet() {
       return
     }
 
-    // Set to 'eating' state and animate
     setState('eating')
     setPet(p => ({
       ...p,
@@ -83,7 +78,6 @@ export default function Pet() {
     }))
     if (feedTimerRef.current) clearTimeout(feedTimerRef.current)
     feedTimerRef.current = window.setTimeout(() => {
-      // If a happy animation is pending (from level up), let the effect handle it
       if (!pendingHappy) setState('neutral')
       feedTimerRef.current = null
     }, 2000)
@@ -104,7 +98,6 @@ export default function Pet() {
     }))
     if (bathTimerRef.current) clearTimeout(bathTimerRef.current)
     bathTimerRef.current = window.setTimeout(() => {
-      // If a happy animation is pending (from level up), let the effect handle it
       if (!pendingHappy) setState('neutral')
       bathTimerRef.current = null
     }, 2000)
@@ -139,7 +132,6 @@ export default function Pet() {
       setSelectedRoom(roomId)
       setPet(p => ({ ...p, room: roomId }))
     } else {
-      // Try to purchase
       if (purchaseRoom(roomId, cost)) {
         setSelectedRoom(roomId)
         setPet(p => ({ ...p, room: roomId }))
@@ -149,8 +141,10 @@ export default function Pet() {
     }
   }
 
+  const containerBgColor = selectedRoom === 'blue-room' ? '#CDDBE6FF' : '#FDDDC4FF'
+
   return (
-    <div className="pet-container">
+    <div className="pet-container" style={{ backgroundColor: containerBgColor }}>
       <CoinTracker />
       {errorMessage && (
         <div className="error-overlay">
@@ -169,7 +163,7 @@ export default function Pet() {
       <div className="pet-header">
         <div className="pet-name">lvl.{level}</div>
       </div>
-      <div className="pet-room" style={{ backgroundImage: `url('${rooms.find(r => r.id === selectedRoom)?.image}')` }}>
+      <div className="pet-room" style={{ backgroundImage: `url('${rooms.find(r => r.id === selectedRoom)?.image}')`, backgroundColor: containerBgColor }}>
         <img
           src={`/assets/pibble_${state}.png`}
           alt="Pibble"

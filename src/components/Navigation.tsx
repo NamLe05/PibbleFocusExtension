@@ -1,4 +1,3 @@
-import React from 'react'
 import { IoSettingsOutline, IoChatbubbleEllipsesOutline, IoPawOutline, IoAlarmOutline, IoBrowsersOutline } from 'react-icons/io5'
 
 type Tab = 'pet' | 'chat' | 'pomodoro'

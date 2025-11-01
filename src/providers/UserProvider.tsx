@@ -19,7 +19,7 @@ const UserContext = createContext<UserContextType | undefined>(undefined)
 const USER_STORAGE_KEY = 'pibble-user-state'
 
 const defaultUserState: UserState = {
-    coins: 500, // Starting coins
+    coins: 300, // Starting coins
     ownedRooms: ['room'] // Default room is owned
 }
 
