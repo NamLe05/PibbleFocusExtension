@@ -8,10 +8,9 @@
     "build:bg": "esbuild src/background.ts --bundle --format=iife --target=chrome114 --outfile=public/background.js",
     "build:assistant": "esbuild src/content/contentScript.ts --bundle --format=iife --target=chrome114 --outfile=public/content/assistant.js",
     "build:overlay": "esbuild src/content/petOverlay.ts --bundle --format=iife --target=chrome114 --outfile=public/content/petOverlay.js",
-    "build": "npm run build:bg && npm run build:assistant && npm run build:overlay",
+    "build": "vite build && mkdir -p dist/content dist/injected dist/assets dist/icons && esbuild src/background.ts --bundle --format=iife --target=chrome114 --outfile=dist/background.js && esbuild src/content/contentScript.ts --bundle --format=iife --target=chrome114 --outfile=dist/content/assistant.js && esbuild src/content/petOverlay.ts --bundle --format=iife --target=chrome114 --outfile=dist/content/petOverlay.js && cp public/manifest.json dist/manifest.json && cp -R public/assets/* dist/assets/ 2>/dev/null || true && cp -R public/icons/* dist/icons/ 2>/dev/null || true && cp public/injected/pageBridge.js dist/injected/pageBridge.js",
     "preview": "vite preview --port 5173",
-    "zip": "node ./scripts/pack-extension.js",
-    "build:dist": "vite build && mkdir -p dist/content dist/injected dist/assets dist/icons && esbuild src/background.ts --bundle --format=iife --target=chrome114 --outfile=dist/background.js && esbuild src/content/contentScript.ts --bundle --format=iife --target=chrome114 --outfile=dist/content/assistant.js && esbuild src/content/petOverlay.ts --bundle --format=iife --target=chrome114 --outfile=dist/content/petOverlay.js && cp public/manifest.json dist/manifest.json && cp -R public/assets/* dist/assets/ 2>/dev/null || true && cp -R public/icons/* dist/icons/ 2>/dev/null || true && cp public/injected/pageBridge.js dist/injected/pageBridge.js"
+    "zip": "npm run build && node ./scripts/pack-extension.js"
   },
   "dependencies": {
     "react": "^18.2.0",

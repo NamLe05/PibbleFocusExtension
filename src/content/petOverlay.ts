@@ -1,204 +1,319 @@
 /* global chrome */
 (() => {
-    const TAG = '[PetOverlay]';
-    const HOST_ID = 'pibble-pet-overlay';
-    const POS_KEY = 'pibble-pet-overlay-pos';
+  const TAG = '[PetOverlay]';
+  const HOST_ID = 'pibble-pet-overlay';
+  const POS_KEY = 'pibble-pet-overlay-pos';
 
-    // Toggle: if already injected, remove and exit
-    const existing = document.getElementById(HOST_ID);
-    if (existing) {
-        console.debug(TAG, 'removed');
-        existing.remove();
-        return;
+  const existing = document.getElementById(HOST_ID);
+  if (existing) {
+    existing.remove();
+    return;
+  }
+
+  const host = document.createElement('div');
+  host.id = HOST_ID;
+  host.style.cssText = `position:fixed;right:20px;bottom:20px;width:120px;height:120px;z-index:2147483647;pointer-events:auto;background:transparent;`;
+
+  try {
+    const saved = localStorage.getItem(POS_KEY);
+    if (saved) {
+      const { x, y } = JSON.parse(saved) as { x: number; y: number };
+      host.style.left = `${x}px`;
+      host.style.top = `${y}px`;
+      host.style.right = 'auto';
+      host.style.bottom = 'auto';
     }
+  } catch { }
 
-    // Host element
-    const host = document.createElement('div');
-    host.id = HOST_ID;
-    host.style.cssText = `
-    position: fixed; right: 20px; bottom: 20px; width: 120px; height: 120px;
-    z-index: 2147483647; pointer-events: auto; background: transparent;
+  const shadow = host.attachShadow({ mode: 'open' });
+
+  const style = document.createElement('style');
+  style.textContent = `
+    :host{all:initial}*{box-sizing:border-box}
+    .wrap{position:relative;width:100%;height:100%}
+    .pet{position:absolute;inset:auto 0 0 0;margin:auto;width:100%;height:auto;cursor:grab;user-select:none;-webkit-user-drag:none;filter:drop-shadow(0 8px 18px rgba(0,0,0,0.25));transition:transform .12s ease;touch-action:none;transform-origin:bottom center;animation:rock 3s ease-in-out infinite}
+    .pet:active{transform:translateY(1px) scale(0.99);cursor:grabbing}
+    @keyframes rock{0%{transform:rotate(-2deg)}50%{transform:rotate(2deg)}100%{transform:rotate(-2deg)}}
+    .bubble{position:absolute;bottom:110%;left:50%;transform:translateX(-50%) scale(0.95);min-width:320px;max-width:420px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border-radius:16px;box-shadow:0 20px 60px rgba(102,126,234,0.4),0 0 0 1px rgba(255,255,255,0.1) inset;padding:0;display:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#fff;opacity:0;transition:opacity .2s,transform .2s}
+    .bubble[data-open="true"]{display:block;opacity:1;transform:translateX(-50%) scale(1)}
+    .bubble::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:10px solid transparent;border-top-color:#764ba2}
+    .bubble-header{padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:space-between}
+    .title{font-weight:600;font-size:15px;margin:0;display:flex;align-items:center;gap:8px}
+    .title::before{content:'✨';font-size:18px}
+    .close{border:none;background:rgba(255,255,255,0.15);width:28px;height:28px;border-radius:50%;font-size:18px;cursor:pointer;color:#fff;display:flex;align-items:center;justify-content:center;transition:all .2s;padding:0}
+    .close:hover{background:rgba(255,255,255,0.25);transform:rotate(90deg)}
+    .bubble-body{padding:20px;position:relative}
+    .hint{font-size:12px;opacity:0.85;line-height:1.4;background:rgba(255,255,255,0.1);padding:10px 12px;border-radius:8px;text-align:center;margin-bottom:16px}
+    .summarize-btn{width:100%;padding:12px 16px;border-radius:12px;border:none;background:rgba(255,255,255,0.95);color:#667eea;cursor:pointer;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s;box-shadow:0 4px 12px rgba(0,0,0,0.1);margin-bottom:12px}
+    .summarize-btn:hover:not(:disabled){background:#fff;transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.15)}
+    .summarize-btn:active:not(:disabled){transform:translateY(0)}
+    .summarize-btn:disabled{pointer-events:none;opacity:0.6}
+    .summarize-icon{font-size:18px}
+    .action-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+    .action-btn{padding:14px 16px;border-radius:12px;border:none;background:rgba(255,255,255,0.95);color:#667eea;cursor:pointer;font-size:14px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:6px;transition:all .2s;box-shadow:0 4px 12px rgba(0,0,0,0.1)}
+    .action-btn:hover:not(:disabled){background:#fff;transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.15)}
+    .action-btn:active:not(:disabled){transform:translateY(0)}
+    .action-btn:disabled{pointer-events:none;opacity:0.6}
+    .action-icon{font-size:20px}
+    .result-container{display:none;margin-top:16px;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.1)}
+    .result-container.show{display:block}
+    .result-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(102,126,234,0.1);border-bottom:1px solid rgba(102,126,234,0.1)}
+    .result-title{font-size:13px;font-weight:600;color:#667eea;margin:0}
+    .copy-btn{border:none;background:rgba(102,126,234,0.1);color:#667eea;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;transition:all .2s}
+    .copy-btn:hover{background:rgba(102,126,234,0.2)}
+    .copy-btn:active{transform:scale(0.95)}
+    .result-content{padding:16px;max-height:200px;overflow-y:auto;font-size:13px;line-height:1.8;color:#333;white-space:pre-wrap;word-wrap:break-word}
+    .result-content::-webkit-scrollbar{width:6px}
+    .result-content::-webkit-scrollbar-track{background:rgba(0,0,0,0.05);border-radius:3px}
+    .result-content::-webkit-scrollbar-thumb{background:rgba(102,126,234,0.3);border-radius:3px}
+    .result-content::-webkit-scrollbar-thumb:hover{background:rgba(102,126,234,0.5)}
+    .status{position:absolute;top:-40px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .2s;z-index:1000}
+    .status.show{opacity:1}
+    @keyframes spin{to{transform:rotate(360deg)}}
   `;
+  shadow.appendChild(style);
 
-    // Restore last position if saved
-    try {
-        const saved = localStorage.getItem(POS_KEY);
-        if (saved) {
-            const { x, y } = JSON.parse(saved) as { x: number; y: number };
-            host.style.left = `${x}px`;
-            host.style.top = `${y}px`;
-            host.style.right = 'auto';
-            host.style.bottom = 'auto';
-        }
-    } catch { }
+  const wrap = document.createElement('div');
+  wrap.className = 'wrap';
+  shadow.appendChild(wrap);
 
-    const shadow = host.attachShadow({ mode: 'open' });
+  const img = document.createElement('img');
+  img.className = 'pet';
+  img.alt = 'Pibble';
+  img.src = chrome.runtime.getURL('assets/pibble_neutral.png');
+  wrap.appendChild(img);
 
-    // Styles (scoped to shadow)
-    const style = document.createElement('style');
-    style.textContent = `
-    :host { all: initial; }
-    .wrap { position: relative; width: 100%; height: 100%; }
-    .pet {
-      position: absolute; inset: auto 0 0 0; margin: auto; width: 100%; height: auto;
-      cursor: grab; user-select: none; -webkit-user-drag: none;
-      filter: drop-shadow(0 8px 18px rgba(0,0,0,0.25));
-      transition: transform .12s ease;
-      touch-action: none; /* allow pointer events for dragging */
-    }
-    .pet:active { transform: translateY(1px) scale(0.99); cursor: grabbing; }
-
-    .bubble {
-      position: absolute;
-      bottom: 110%;
-      left: 50%;
-      transform: translateX(-50%);
-      min-width: 220px;
-      max-width: 280px;
-      background: #ffffff;
-      border-radius: 12px;
-      box-shadow: 0 14px 36px rgba(0,0,0,0.22);
-      padding: 10px;
-      display: none;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      color: #2c3e50;
-    }
-    .bubble[data-open="true"] { display: block; }
-    .bubble::after {
-      content: '';
-      position: absolute;
-      top: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      border: 8px solid transparent;
-      border-top-color: #ffffff;
-    }
-    .row { display: flex; gap: 8px; }
-    .btn {
-      flex: 1 1 0;
-      padding: 8px 10px;
-      border-radius: 8px;
-      border: none;
-      background: #4A90E2;
-      color: #fff;
-      cursor: pointer;
-      font-size: 13px;
-    }
-    .btn:hover { background: #357ABD; }
-    .title { font-weight: 700; font-size: 13px; margin: 0 0 8px 0; }
-    .close {
-      position: absolute; top: 6px; right: 8px; border: none; background: transparent;
-      font-size: 16px; cursor: pointer; color: #999;
-    }
-  `;
-    shadow.appendChild(style);
-
-    // Structure
-    const wrap = document.createElement('div');
-    wrap.className = 'wrap';
-    shadow.appendChild(wrap);
-
-    // Pet image
-    const img = document.createElement('img');
-    img.className = 'pet';
-    img.alt = 'Pibble';
-    img.src = chrome.runtime.getURL('assets/pibble_neutral.png'); // ensure assets/* in web_accessible_resources
-    wrap.appendChild(img);
-
-    // Popup bubble
-    const bubble = document.createElement('div');
-    bubble.className = 'bubble';
-    bubble.innerHTML = `
-    <button class="close" title="Close">×</button>
-    <div class="title">Need help with text?</div>
-    <div class="row">
-      <button class="btn" id="proof">Proofread</button>
-      <button class="btn" id="rewrite">Rewrite</button>
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.innerHTML = `
+    <div class="bubble-header">
+      <div class="title">AI Assistant</div>
+      <button class="close" title="Close">×</button>
     </div>
-    <div style="margin-top:6px; font-size:12px; opacity:.8;">
-      Select text on the page first. If direct replace fails, the result is copied to clipboard.
+    <div class="bubble-body">
+      <div class="hint">Copy text or click Summarize for page summary</div>
+      <button class="summarize-btn" data-mode="summarize">
+        <span class="summarize-icon">📄</span>
+        <span>Summarize Page</span>
+      </button>
+      <div class="action-grid">
+        <button class="action-btn" data-mode="proofread">
+          <span class="action-icon">📝</span>
+          <span>Proofread</span>
+        </button>
+        <button class="action-btn" data-mode="rewrite">
+          <span class="action-icon">✍️</span>
+          <span>Rewrite</span>
+        </button>
+      </div>
+      <div class="result-container">
+        <div class="result-header">
+          <div class="result-title">Result</div>
+          <button class="copy-btn">
+            <span>📋</span>
+            <span class="copy-text">Copy</span>
+          </button>
+        </div>
+        <div class="result-content"></div>
+      </div>
     </div>
+    <div class="status"></div>
   `;
-    wrap.appendChild(bubble);
+  wrap.appendChild(bubble);
 
-    // Messaging
-    type Mode = 'proofread' | 'rewrite';
-    const send = (mode: Mode) => chrome.runtime.sendMessage({ type: 'AI_ACTION', mode });
+  const statusEl = bubble.querySelector('.status') as HTMLDivElement;
+  const closeBtn = bubble.querySelector('.close') as HTMLButtonElement;
+  const resultContainer = bubble.querySelector('.result-container') as HTMLDivElement;
+  const resultContent = bubble.querySelector('.result-content') as HTMLDivElement;
+  const resultTitle = bubble.querySelector('.result-title') as HTMLDivElement;
+  const copyBtn = bubble.querySelector('.copy-btn') as HTMLButtonElement;
+  const copyText = copyBtn.querySelector('.copy-text') as HTMLSpanElement;
+  const summarizeBtn = bubble.querySelector('.summarize-btn') as HTMLButtonElement;
+  const actionButtons = bubble.querySelectorAll('.action-btn') as NodeListOf<HTMLButtonElement>;
 
-    (bubble.querySelector('#proof') as HTMLButtonElement | null)?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        send('proofread');
-    });
-    (bubble.querySelector('#rewrite') as HTMLButtonElement | null)?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        send('rewrite');
-    });
-    (bubble.querySelector('.close') as HTMLButtonElement | null)?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        bubble.setAttribute('data-open', 'false');
-    });
+  let currentResult = '';
+  let isProcessing = false;
 
-    // Drag vs click handling
-    let pointerDown = false;
-    let dragging = false;
-    let startX = 0;
-    let startY = 0;
-    let offX = 0;
-    let offY = 0;
-    const DRAG_THRESHOLD = 3; // px
+  function showStatus(msg: string, ms = 2000) {
+    statusEl.textContent = msg;
+    statusEl.classList.add('show');
+    setTimeout(() => statusEl.classList.remove('show'), ms);
+  }
 
-    const clamp = (x: number, y: number) => {
-        const maxX = Math.max(0, window.innerWidth - host.offsetWidth);
-        const maxY = Math.max(0, window.innerHeight - host.offsetHeight);
-        return { x: Math.min(Math.max(0, x), maxX), y: Math.min(Math.max(0, y), maxY) };
+  function setProcessing(processing: boolean) {
+    isProcessing = processing;
+    summarizeBtn.disabled = processing;
+    actionButtons.forEach(btn => (btn as HTMLButtonElement).disabled = processing);
+  }
+
+  function showResult(text: string, mode: string) {
+    // Add extra spacing for summary bullet points
+    let displayText = text;
+    if (mode === 'summarize') {
+      // Ensure double line breaks between bullet points
+      displayText = text
+        .replace(/\n-/g, '\n\n-')
+        .replace(/\n\n\n+/g, '\n\n')  // Clean up triple+ newlines
+        .trim();
+    }
+
+    currentResult = text;  // Keep original for clipboard
+    resultContent.textContent = displayText;
+    const titles: Record<string, string> = {
+      proofread: 'Proofread Result',
+      rewrite: 'Rewrite Result',
+      summarize: 'Page Summary'
     };
+    resultTitle.textContent = titles[mode] || 'Result';
+    resultContainer.classList.add('show');
+    copyText.textContent = 'Copy';
+  }
 
-    img.addEventListener('pointerdown', (e: PointerEvent) => {
-        pointerDown = true;
-        dragging = false;
-        startX = e.clientX;
-        startY = e.clientY;
-        img.setPointerCapture?.(e.pointerId);
-        const rect = host.getBoundingClientRect();
-        offX = startX - rect.left;
-        offY = startY - rect.top;
+  function hideResult() {
+    resultContainer.classList.remove('show');
+    currentResult = '';
+  }
+
+  window.addEventListener('message', (e: MessageEvent) => {
+    if (e.source !== window) return;
+
+    if (e.data?.type === 'PIBBLE_STATUS') {
+      const msg = e.data.message;
+
+      // Check if it's a loading/processing message
+      if (msg.startsWith('⏳') || msg.startsWith('⚙️')) {
+        setProcessing(true);
+        showStatus(msg, 30000); // Keep visible during processing
+      }
+      // Check if it's an error or warning
+      else if (msg.startsWith('⚠️') || msg.startsWith('❌')) {
+        setProcessing(false);
+        hideResult();
+        showStatus(msg, 3000);
+      }
+      // Check if it's a success message
+      else if (msg.startsWith('✅')) {
+        setProcessing(false);
+        showStatus(msg, 2000);
+      }
+      // Default: show as status
+      else {
+        showStatus(msg, 3000);
+      }
+    }
+
+    if (e.data?.type === 'PIBBLE_RESULT') {
+      setProcessing(false);
+      const { text, mode } = e.data;
+      showResult(text, mode);
+    }
+  });
+
+  copyBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (!currentResult) return;
+
+    try {
+      await navigator.clipboard.writeText(currentResult);
+      copyText.textContent = '✓ Copied!';
+      showStatus('✅ Copied to clipboard!', 2000);
+      setTimeout(() => { copyText.textContent = 'Copy'; }, 2000);
+    } catch (err) {
+      showStatus('❌ Copy failed', 2000);
+    }
+  });
+
+  // Handle summarize button
+  summarizeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (isProcessing) return;
+
+    awardCoins(5);
+    hideResult();
+    window.postMessage({ type: 'PIBBLE_ACTION', mode: 'summarize' }, '*');
+  });
+
+  // Handle proofread/rewrite buttons
+  actionButtons.forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (isProcessing) return;
+
+      const mode = (btn as HTMLElement).dataset.mode;
+      if (mode === 'proofread' || mode === 'rewrite') {
+        awardCoins(1); // +1 for proofread/rewrite
+      }
+      hideResult();
+      window.postMessage({ type: 'PIBBLE_ACTION', mode }, '*');
     });
+  });
 
-    window.addEventListener('pointermove', (e: PointerEvent) => {
-        if (!pointerDown) return;
-        const dx = e.clientX - startX;
-        const dy = e.clientY - startY;
-        if (!dragging && Math.hypot(dx, dy) > DRAG_THRESHOLD) dragging = true;
-        if (!dragging) return;
+  closeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    bubble.setAttribute('data-open', 'false');
+    hideResult();
+    setProcessing(false);
+    statusEl.classList.remove('show');
+  });
 
-        let x = e.clientX - offX;
-        let y = e.clientY - offY;
-        const next = clamp(x, y);
-        host.style.left = `${next.x}px`;
-        host.style.top = `${next.y}px`;
-        host.style.right = 'auto';
-        host.style.bottom = 'auto';
-    });
+  // Dragging logic
+  let down = false;
+  let drag = false;
+  let sx = 0;
+  let sy = 0;
+  let ox = 0;
+  let oy = 0;
+  const THRESH = 5;
 
-    window.addEventListener('pointerup', () => {
-        if (!pointerDown) return;
-        pointerDown = false;
+  const clamp = (x: number, y: number) => {
+    const mx = Math.max(0, window.innerWidth - host.offsetWidth);
+    const my = Math.max(0, window.innerHeight - host.offsetHeight);
+    return { x: Math.min(Math.max(0, x), mx), y: Math.min(Math.max(0, y), my) };
+  };
 
-        if (dragging) {
-            // Save position after drag
-            dragging = false;
-            try {
-                const rect = host.getBoundingClientRect();
-                localStorage.setItem(POS_KEY, JSON.stringify({ x: rect.left, y: rect.top }));
-            } catch { }
-        } else {
-            // Treat as click: toggle popup
-            const open = bubble.getAttribute('data-open') === 'true';
-            bubble.setAttribute('data-open', open ? 'false' : 'true');
-        }
-    });
+  img.addEventListener('pointerdown', (e: PointerEvent) => {
+    down = true;
+    drag = false;
+    sx = e.clientX;
+    sy = e.clientY;
+    img.setPointerCapture?.(e.pointerId);
+    const r = host.getBoundingClientRect();
+    ox = sx - r.left;
+    oy = sy - r.top;
+  });
 
-    document.documentElement.appendChild(host);
-    console.debug(TAG, 'injected on', location.href);
+  window.addEventListener('pointermove', (e: PointerEvent) => {
+    if (!down) return;
+    const dx = e.clientX - sx;
+    const dy = e.clientY - sy;
+    if (!drag && Math.hypot(dx, dy) > THRESH) drag = true;
+    if (!drag) return;
+    const next = clamp(e.clientX - ox, e.clientY - oy);
+    host.style.left = `${next.x}px`;
+    host.style.top = `${next.y}px`;
+    host.style.right = 'auto';
+    host.style.bottom = 'auto';
+  });
+
+  window.addEventListener('pointerup', () => {
+    if (!down) return;
+    down = false;
+    if (drag) {
+      drag = false;
+      try {
+        const r = host.getBoundingClientRect();
+        localStorage.setItem(POS_KEY, JSON.stringify({ x: r.left, y: r.top }));
+      } catch { }
+    } else {
+      const open = bubble.getAttribute('data-open') === 'true';
+      bubble.setAttribute('data-open', open ? 'false' : 'true');
+    }
+  });
+
+  document.documentElement.appendChild(host);
+
+  function awardCoins(amount: any) {
+    chrome.runtime.sendMessage({ type: 'AWARD_COINS', amount });
+  }
 })();
 

@@ -1,131 +1,279 @@
-// Runs in the page context. Prefer LanguageModel; fallback to legacy window.ai.
-// Avoid passing topK/temperature unless necessary; handle downloadable/downloading.
 (() => {
-    const TAG = '[PibbleBridge]';
-    let session = null;
+    'use strict';
 
-    const hasLanguageModel = () =>
-        typeof window !== 'undefined' &&
-        !!window.LanguageModel &&
-        typeof window.LanguageModel.availability === 'function';
+    const hasWindowAI = typeof window.ai !== 'undefined';
+    const hasSelfAI = typeof self.ai !== 'undefined';
+    const hasProofreader = typeof Proofreader !== 'undefined';
+    const hasRewriter = typeof Rewriter !== 'undefined';
+    const hasSummarizer = typeof Summarizer !== 'undefined';
 
-    const hasLegacyAI = () =>
-        typeof window !== 'undefined' &&
-        !!window.ai &&
-        typeof window.ai.canCreateTextSession === 'function';
+    const ai = hasWindowAI ? window.ai : (hasSelfAI ? self.ai : null);
 
-    async function lmAvailability() {
+    let promptSession = null;
+    let proofreaderSession = null;
+    let rewriterSession = null;
+    let summarizerSession = null;
+
+    async function createProofreaderSession() {
+        if (!hasProofreader) return null;
+
         try {
-            return await window.LanguageModel.availability();
-        } catch (e) {
-            return `error:${e?.message || e}`;
-        }
-    }
+            const availability = await Proofreader.availability();
+            if (availability === 'no') return null;
 
-    async function legacyAvailability() {
-        try {
-            const a = await window.ai.canCreateTextSession();
-            if (a === 'readily') return 'available';
-            if (a === 'after-download') return 'downloadable';
-            if (a === 'no') return 'unavailable';
-            return String(a || 'unavailable');
-        } catch (e) {
-            return `error:${e?.message || e}`;
-        }
-    }
-
-    async function ensureSession(opts) {
-        if (hasLanguageModel()) {
-            const availability = await lmAvailability();
-            if (availability === 'unavailable') throw new Error('Prompt API unavailable in page.');
-            const base = {
-                ...(opts?.systemPrompt ? { initialPrompts: [{ role: 'system', content: opts.systemPrompt }] } : {}),
+            const pr = await Proofreader.create({
+                expectedInputLanguages: ['en'],
                 monitor(m) {
-                    m.addEventListener('downloadprogress', (e) => {
-                        // eslint-disable-next-line no-console
-                        console.debug(TAG, 'downloadprogress', e?.loaded);
-                    });
+                    m.addEventListener('downloadprogress', () => { });
                 }
-            };
+            });
+
+            return pr;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    async function useProofreader(text) {
+        if (!proofreaderSession) {
+            proofreaderSession = await createProofreaderSession();
+        }
+
+        if (!proofreaderSession) {
+            throw new Error('Proofreader API unavailable');
+        }
+
+        const result = await proofreaderSession.proofread(text);
+
+        let correctedText = text;
+        if (result && typeof result === 'object') {
+            if (typeof result.correctedInput === 'string') {
+                correctedText = result.correctedInput;
+            } else if (typeof result.corrected === 'string') {
+                correctedText = result.corrected;
+            }
+        } else if (typeof result === 'string') {
+            correctedText = result;
+        }
+
+        return correctedText;
+    }
+
+    async function createRewriterSession() {
+        if (!hasRewriter) return null;
+
+        try {
+            const availability = await Rewriter.availability();
+            if (availability === 'no') return null;
+
+            const tones = ['as-is', 'more-formal', 'more-casual'];
+            const formats = ['as-is', 'plain-text'];
+            const lengths = ['as-is', 'shorter', 'longer'];
+
+            const randomTone = tones[Math.floor(Math.random() * tones.length)];
+            const randomFormat = formats[Math.floor(Math.random() * formats.length)];
+            const randomLength = lengths[Math.floor(Math.random() * lengths.length)];
+
+            const rw = await Rewriter.create({
+                sharedContext: 'Rewrite text to be clearer and more concise. Provide a fresh alternative perspective.',
+                tone: randomTone,
+                format: randomFormat,
+                length: randomLength,
+                monitor(m) {
+                    m.addEventListener('downloadprogress', () => { });
+                }
+            });
+            return rw;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    async function useRewriter(text) {
+        if (rewriterSession) {
             try {
-                session = await window.LanguageModel.create(base);
-                return;
-            } catch (e) {
-                const msg = String(e?.message || e);
-                if (/topK|temperature/i.test(msg)) {
-                    session = await window.LanguageModel.create(); // retry bare
-                    return;
+                await rewriterSession.destroy();
+            } catch (e) { }
+            rewriterSession = null;
+        }
+
+        rewriterSession = await createRewriterSession();
+
+        if (!rewriterSession) {
+            throw new Error('Rewriter API unavailable');
+        }
+
+        const result = await rewriterSession.rewrite(text);
+        const rewrittenText = result || text;
+        return rewrittenText;
+    }
+
+    async function createSummarizerSession() {
+        if (!hasSummarizer) return null;
+
+        try {
+            const availability = await Summarizer.availability();
+            if (availability === 'no') return null;
+
+            const sm = await Summarizer.create({
+                type: 'key-points',
+                format: 'markdown',
+                length: 'medium',
+                sharedContext: 'Summarize webpage content into clear bullet points',
+                monitor(m) {
+                    m.addEventListener('downloadprogress', () => { });
                 }
-                if (/NotAllowedError|gesture|user/i.test(msg) || availability === 'downloadable' || availability === 'downloading') {
-                    throw new Error('Model download requires a user click on the page. Click anywhere, keep the tab open, then try again.');
+            });
+            return sm;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    async function useSummarizer(text) {
+        if (!summarizerSession) {
+            summarizerSession = await createSummarizerSession();
+        }
+
+        if (!summarizerSession) {
+            throw new Error('Summarizer API unavailable');
+        }
+
+        const result = await summarizerSession.summarize(text, {
+            context: 'This is content from a webpage that needs to be summarized concisely.'
+        });
+
+        const formatted = result.replace(/\n- /g, '\n\n- ');
+        return formatted;
+    }
+
+    async function createPromptSession() {
+        if (!ai || !ai.languageModel) return null;
+
+        try {
+            const capabilities = await ai.languageModel.capabilities();
+            if (capabilities.available === 'no') return null;
+
+            const sess = await ai.languageModel.create({
+                systemPrompt: 'You are a helpful writing assistant. When rewriting, provide creative alternatives with varied phrasing.',
+                monitor(m) {
+                    m.addEventListener('downloadprogress', () => { });
                 }
-                throw e;
+            });
+
+            return sess;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    async function usePromptAPI(text, mode) {
+        if (mode === 'rewrite') {
+            if (promptSession) {
+                try {
+                    await promptSession.destroy();
+                } catch (e) { }
+                promptSession = null;
             }
         }
 
-        if (hasLegacyAI()) {
-            const availability = await legacyAvailability();
-            if (availability === 'unavailable') throw new Error('Prompt API unavailable in page.');
-            session = await window.ai.createTextSession({
-                model: 'gemini-nano',
-                temperature: typeof opts?.temperature === 'number' ? opts.temperature : 0.7,
-                systemPrompt: opts?.systemPrompt ?? undefined
-            });
-            return;
+        if (!promptSession) {
+            promptSession = await createPromptSession();
         }
 
-        throw new Error('Prompt API unavailable in page');
+        if (!promptSession) {
+            throw new Error('Prompt API unavailable');
+        }
+
+        let prompt;
+        if (mode === 'proofread') {
+            prompt = 'Proofread the following text. Fix grammar, spelling, and punctuation. Return only the corrected text.\n\n' + text;
+        } else if (mode === 'summarize') {
+            prompt = 'Summarize the following text into 5-7 key bullet points. Use clear, concise language. Format as a markdown list.\n\n' + text;
+        } else {
+            const styles = [
+                'Rewrite the following text to be clearer and more concise.',
+                'Rewrite the following text with a fresh perspective and varied phrasing.',
+                'Rewrite the following text to be more engaging and impactful.',
+                'Rewrite the following text with alternative word choices and sentence structures.'
+            ];
+            const randomStyle = styles[Math.floor(Math.random() * styles.length)];
+            prompt = randomStyle + ' Return only the rewritten text.\n\n' + text;
+        }
+
+        const result = await promptSession.prompt(prompt);
+        return result;
     }
 
-    async function getBridgeInfo() {
-        if (hasLanguageModel()) {
-            const availability = await lmAvailability();
-            return { tag: TAG, href: location.href, hasAI: true, api: 'LanguageModel', availability };
-        }
-        if (hasLegacyAI()) {
-            const availability = await legacyAvailability();
-            return { tag: TAG, href: location.href, hasAI: true, api: 'window.ai', availability };
-        }
-        return { tag: TAG, href: location.href, hasAI: false, api: 'none', availability: 'unavailable' };
-    }
+    async function handleRequest(text, mode) {
+        try {
+            let result;
 
-    async function handlePrompt(userText, opts) {
-        if (!userText || !userText.trim()) throw new Error('Empty prompt.');
-        if (!session) await ensureSession(opts);
-        return await session.prompt(userText);
+            if (mode === 'proofread') {
+                if (hasProofreader) {
+                    result = await useProofreader(text);
+                } else if (ai) {
+                    result = await usePromptAPI(text, mode);
+                } else {
+                    throw new Error('No API available for proofreading');
+                }
+            } else if (mode === 'rewrite') {
+                if (hasRewriter) {
+                    result = await useRewriter(text);
+                } else if (ai) {
+                    result = await usePromptAPI(text, mode);
+                } else {
+                    throw new Error('No API available for rewriting');
+                }
+            } else if (mode === 'summarize') {
+                if (hasSummarizer) {
+                    result = await useSummarizer(text);
+                } else if (ai) {
+                    result = await usePromptAPI(text, mode);
+                } else {
+                    throw new Error('No API available for summarizing');
+                }
+            } else {
+                throw new Error('Unknown mode: ' + mode);
+            }
+
+            return result;
+
+        } catch (error) {
+            throw error;
+        }
     }
 
     window.addEventListener('message', async (event) => {
         if (event.source !== window) return;
         const data = event.data;
-        if (!data || typeof data !== 'object') return;
+        if (!data || data.type !== 'PBRIDGE_REQUEST') return;
 
-        if (data.type === 'PBRIDGE_REQUEST') {
-            const { requestId, payload } = data || {};
-            if (!requestId) return;
-            try {
-                const text = await handlePrompt(payload?.userText, {
-                    temperature: payload?.temperature,
-                    systemPrompt: payload?.systemPrompt
-                });
-                window.postMessage({ type: 'PBRIDGE_RESPONSE', requestId, text }, '*');
-            } catch (e) {
-                const message =
-                    e?.message ||
-                    'Prompt API error. If first run, click the page once to permit model download, keep it open, then try again.';
-                window.postMessage({ type: 'PBRIDGE_RESPONSE', requestId, error: message }, '*');
+        const requestId = data.requestId;
+        const payload = data.payload;
+
+        try {
+            const text = payload.userText || '';
+            const mode = payload.mode || 'prompt';
+
+            if (!text) {
+                throw new Error('No text provided');
             }
-            return;
-        }
 
-        if (data.type === 'PBRIDGE_PING') {
-            const { requestId } = data || {};
-            const info = await getBridgeInfo();
-            window.postMessage({ type: 'PBRIDGE_PONG', requestId, info }, '*');
-            return;
+            const result = await handleRequest(text, mode);
+
+            window.postMessage({
+                type: 'PBRIDGE_RESPONSE',
+                requestId: requestId,
+                text: result
+            }, '*');
+
+        } catch (error) {
+            window.postMessage({
+                type: 'PBRIDGE_RESPONSE',
+                requestId: requestId,
+                error: String(error)
+            }, '*');
         }
     });
-
-    // eslint-disable-next-line no-console
-    console.debug(TAG, 'bridge initialized on', location.href);
 })();

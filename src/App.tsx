@@ -7,8 +7,9 @@ import Chat from './components/Chat'
 import Pomodoro from './components/Pomodoro'
 import Navigation from './components/Navigation'
 import './styles.css'
+import { UserProvider } from './providers/UserProvider'
 
-type Tab = 'pet' | 'chat' | 'settings' | 'pomodoro'
+type Tab = 'pet' | 'chat' | 'pomodoro'
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('pet')
@@ -21,23 +22,23 @@ export default function App() {
         return <Chat />
       case 'pomodoro':
         return <Pomodoro />
-      case 'settings':
-        return <div>Settings Coming Soon</div>
     }
   }
 
   return (
     <div className="app">
-      <PetProvider>
-        <PomodoroProvider>
-          <TaskProvider>
-            <main>
-              {renderContent()}
-            </main>
-            <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
-          </TaskProvider>
-        </PomodoroProvider>
-      </PetProvider>
+      <UserProvider>
+        <PetProvider>
+          <PomodoroProvider>
+            <TaskProvider>
+              <main>
+                {renderContent()}
+              </main>
+              <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
+            </TaskProvider>
+          </PomodoroProvider>
+        </PetProvider>
+      </UserProvider>
     </div>
   )
 }

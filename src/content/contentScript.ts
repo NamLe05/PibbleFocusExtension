@@ -1,131 +1,155 @@
 /* global chrome */
 (function () {
-    const TAG = '[PibbleContent]';
-    console.debug(TAG, 'loaded on', location.href);
+    let bridgeReady = false;
 
     function ensureBridgeInjected() {
         if ((window as any).__pibbleBridgeInjected) return;
         const s = document.createElement('script');
         s.src = chrome.runtime.getURL('injected/pageBridge.js');
-        s.onload = () => s.remove();
+        s.onload = () => {
+            s.remove();
+            setTimeout(() => {
+                bridgeReady = true;
+            }, 500);
+        };
+        s.onerror = () => { };
         (window as any).__pibbleBridgeInjected = true;
-        (document.documentElement).appendChild(s);
+        document.documentElement.appendChild(s);
     }
 
-    // Track pending bridge requests by requestId
-    const pending = new Map<string, (resp: any) => void>();
+    ensureBridgeInjected();
 
-    // Listen for bridge responses
+    const pending = new Map<string, (resp: { text?: string; error?: string }) => void>();
+
     window.addEventListener('message', (event: MessageEvent) => {
         if (event.source !== window) return;
         const data = event.data;
         if (!data || typeof data !== 'object') return;
 
-        if (data.type === 'PBRIDGE_RESPONSE' || data.type === 'PBRIDGE_PONG') {
+        if (data.type === 'PBRIDGE_RESPONSE' && data.requestId) {
             const resolver = pending.get(data.requestId);
             if (resolver) {
-                console.debug(TAG, 'received', data.type, data.info ?? '');
-                resolver({ text: data.text, error: data.error, info: data.info });
+                resolver({ text: data.text, error: data.error });
                 pending.delete(data.requestId);
             }
         }
     });
 
-    function bridgePrompt(userText: string): Promise<string> {
-        ensureBridgeInjected();
-        const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    function bridgePrompt(text: string, mode: 'proofread' | 'rewrite' | 'summarize'): Promise<string> {
+        const requestId = `req-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
                 pending.delete(requestId);
-                reject(new Error('Timed out'));
-            }, 30000);
+                reject(new Error('AI timeout'));
+            }, 60000);
 
             pending.set(requestId, (resp) => {
                 clearTimeout(timeout);
-                if (resp?.error) reject(new Error(resp.error));
-                else resolve(String(resp?.text ?? ''));
+                if (resp.error) {
+                    reject(new Error(resp.error));
+                } else {
+                    resolve(String(resp.text ?? ''));
+                }
             });
 
-            window.postMessage(
-                { type: 'PBRIDGE_REQUEST', requestId, payload: { userText } },
-                '*'
-            );
+            window.postMessage({
+                type: 'PBRIDGE_REQUEST',
+                requestId,
+                payload: {
+                    userText: text,
+                    mode: mode
+                }
+            }, '*');
         });
     }
 
-    function getSelectionInfo(): { text: string; range?: Range } {
-        const sel = window.getSelection();
-        if (!sel || sel.rangeCount === 0) return { text: '' };
-        return { text: sel.toString(), range: sel.getRangeAt(0) };
-    }
-
-    function buildPrompt(mode: 'proofread' | 'rewrite', src: string) {
-        return mode === 'proofread'
-            ? `Proofread the following text. Fix grammar, spelling, and clarity. Keep meaning and tone. Return only the corrected text.\n\n---\n${src}`
-            : `Rewrite the following text to be clearer and more concise while preserving meaning and voice. Return only the rewritten text.\n\n---\n${src}`;
-    }
-
-    async function replaceSelection(range: Range, newText: string) {
-        const editableRoot =
-            range.commonAncestorContainer instanceof Element
-                ? (range.commonAncestorContainer.closest?.('[contenteditable="true"]') as HTMLElement | null)
-                : null;
-
-        if (editableRoot) {
-            range.deleteContents();
-            range.insertNode(document.createTextNode(newText));
-            return true;
-        }
-
-        const active = document.activeElement as HTMLTextAreaElement | HTMLInputElement | null;
-        if (active && (active.tagName === 'TEXTAREA' || (active.tagName === 'INPUT' && (active as any).type === 'text'))) {
-            const start = (active as any).selectionStart ?? 0;
-            const end = (active as any).selectionEnd ?? start;
-            const value = active.value;
-            active.value = value.slice(0, start) + newText + value.slice(end);
-            active.dispatchEvent(new Event('input', { bubbles: true }));
-            return true;
-        }
-
-        return false;
-    }
-
-    async function handle(mode: 'proofread' | 'rewrite') {
+    async function getSelectionText(): Promise<string> {
         try {
-            const { text, range } = getSelectionInfo();
-            if (!text.trim()) return;
-            const answer = await bridgePrompt(buildPrompt(mode, text));
-            const ok = range ? await replaceSelection(range, answer) : false;
-            if (!ok) await navigator.clipboard.writeText(answer);
+            const text = await navigator.clipboard.readText();
+            if (text && text.trim()) {
+                return text.trim();
+            }
+        } catch (e) { }
+        return '';
+    }
+
+    function extractPageText(): string {
+        const main = document.querySelector('main, article, [role="main"]');
+        const target = (main || document.body) as HTMLElement;
+        const text = target.innerText || target.textContent || '';
+        return text.trim();
+    }
+
+    async function handleAIAction(mode: 'proofread' | 'rewrite' | 'summarize') {
+        try {
+            if (!bridgeReady) {
+                window.postMessage({ type: 'PIBBLE_STATUS', message: '⏳ Initializing AI...' }, '*');
+
+                let attempts = 0;
+                while (!bridgeReady && attempts < 20) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    attempts++;
+                }
+
+                if (!bridgeReady) {
+                    throw new Error('AI initialization timeout');
+                }
+            }
+
+            let selectedText = '';
+
+            if (mode === 'summarize') {
+                selectedText = extractPageText();
+
+                if (!selectedText) {
+                    throw new Error('No text found on page');
+                }
+            } else {
+                selectedText = await getSelectionText();
+
+                if (!selectedText) {
+                    window.postMessage({ type: 'PIBBLE_STATUS', message: '⚠️ Please copy text first' }, '*');
+                    return;
+                }
+            }
+
+            const statusMsg = mode === 'proofread' ? 'Proofreading' : mode === 'rewrite' ? 'Rewriting' : 'Summarizing page';
+            window.postMessage({ type: 'PIBBLE_STATUS', message: `⚙️ ${statusMsg}...` }, '*');
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage({ type: 'PIBBLE_STATUS', message: `⚙️ ${statusMsg}...` }, '*');
+            }
+
+            const result = await bridgePrompt(selectedText, mode);
+
+            window.postMessage({ type: 'PIBBLE_RESULT', text: result, mode: mode }, '*');
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage({ type: 'PIBBLE_RESULT', text: result, mode: mode }, '*');
+            }
+
+            window.postMessage({ type: 'PIBBLE_STATUS', message: '✅ Done! Click copy to use result' }, '*');
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage({ type: 'PIBBLE_STATUS', message: '✅ Done! Click copy to use result' }, '*');
+            }
+
         } catch (e) {
-            console.warn('[PibbleAssistant]', e);
+            const errorMsg = e instanceof Error ? e.message : String(e);
+            window.postMessage({ type: 'PIBBLE_STATUS', message: `❌ ${errorMsg}` }, '*');
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage({ type: 'PIBBLE_STATUS', message: `❌ ${errorMsg}` }, '*');
+            }
         }
     }
 
-    // Optional prompt/bridge ping support for other callers
-    function postWithReply(type: 'PBRIDGE_REQUEST' | 'PBRIDGE_PING', payload: any, sendResponse: (resp: any) => void) {
-        const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        pending.set(requestId, sendResponse);
-        console.debug(TAG, 'forwarding', type, 'requestId=', requestId);
-        window.postMessage({ type, requestId, payload }, '*');
-    }
+    window.addEventListener('message', (event: MessageEvent) => {
+        const data = event.data;
+        if (!data || typeof data !== 'object') return;
 
-    chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-        if (msg?.type === 'PROMPT_TEXT') {
-            postWithReply('PBRIDGE_REQUEST', {
-                userText: msg.userText,
-                systemPrompt: msg.systemPrompt ?? null,
-                temperature: msg.temperature ?? 0.7
-            }, sendResponse);
-            return true; // async
+        if (data.type === 'PIBBLE_ACTION') {
+            const mode = data.mode;
+            if (mode === 'proofread' || mode === 'rewrite' || mode === 'summarize') {
+                handleAIAction(mode);
+            }
         }
-
-        if (msg?.type === 'BRIDGE_PING') {
-            postWithReply('PBRIDGE_PING', {}, sendResponse);
-            return true; // async
-        }
-
-        if (msg?.type === 'AI_PROOFREAD') handle('proofread');
-        if (msg?.type === 'AI_REWRITE') handle('rewrite');
     });
 })();

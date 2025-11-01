@@ -43,7 +43,7 @@ main {
 
 .nav-container {
     position: absolute;
-    top: 425px;
+    top: 435px;
     left: 20px;
     display: flex;
     flex-direction: row;
@@ -54,17 +54,18 @@ main {
     padding: 8px 16px;
     /* Adjusted padding for better spacing */
     border-radius: 20px;
-    height: 50px;
+    height: 40px;
     width: calc(300px - 70px);
     z-index: 10;
     border: 0px;
     align-items: center;
     /* Center items vertically */
     justify-content: center;
+    box-shadow: 0px 3px 3px rgba(0, 0, 0, 0.3);
 }
 
 .nav-button {
-    width: 30px;
+    width: 12%;
     height: 30px;
     background: transparent;
     border: none;
@@ -90,4 +91,86 @@ main {
     color: white;
     transform: scale(1.3);
     background: rgba(255, 255, 255, 0.1);
+}
+
+
+/* Coin Tracker - Reusable Component */
+.coin-tracker {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: white;
+    padding: 3px 6px;
+    border-radius: 20px;
+    border: 1.5px solid #333;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: transform 0.2s ease;
+}
+
+.coin-tracker:hover {
+    transform: scale(1.05);
+}
+
+.coin-tracker-amount {
+    font-family: 'Varela Round', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: #333;
+    letter-spacing: 0.5px;
+}
+
+.coin-tracker-icon {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+}
+
+/* Coin Delta Emit Animation */
+.coin-delta-emit {
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    font-size: 15px;
+    font-weight: 700;
+    color: #27ae60;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+    pointer-events: none;
+    opacity: 0;
+    animation: coin-delta-float 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    z-index: 100;
+}
+
+.coin-delta-emit img {
+    width: 18px;
+    height: 18px;
+    margin-left: 2px;
+}
+
+@keyframes coin-delta-float {
+    0% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(0);
+    }
+
+    10% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(8px);
+    }
+
+    80% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(28px);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(40px);
+    }
 }

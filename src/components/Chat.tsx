@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { IoSend } from 'react-icons/io5';
 import './styles/chatStyles.css';
+import CoinTracker from './CoinTracker';
+import { useUser } from '../providers/UserProvider';
 
 interface Message {
     id: string;
@@ -70,6 +72,7 @@ export default function Chat() {
     const pollingRef = useRef<number | null>(null);
 
     const endRef = useRef<HTMLDivElement>(null);
+    const { addCoins } = useUser();
 
     useEffect(() => {
         injectTypingCssOnce();
@@ -347,6 +350,9 @@ export default function Chat() {
         setInputText('');
         setIsLoading(true);
 
+        // Award +1 coin for each chat
+        addCoins(1);
+
         try {
             const resp = await promptViaPopupOrBridge({
                 userText: userMsg.text,
@@ -375,6 +381,7 @@ export default function Chat() {
 
     return (
         <div className="chat-container">
+            <CoinTracker />
             <div className="chat-header">
                 <div className="avatar">
                     <img src="/assets/pibble_neutral.png" alt="Pibble" />

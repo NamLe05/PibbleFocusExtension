@@ -1,28 +1,26 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import { resolve } from 'path'
+import { defineConfig } from 'vite';
+import { resolve } from 'path';
 
 export default defineConfig({
-  base: './',
-  plugins: [react()],
   build: {
     outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        index: resolve(__dirname, 'index.html'),
-        background: resolve(__dirname, 'src/background.ts'),
-        contentScript: resolve(__dirname, 'src/content/contentScript.ts')
+        popup: resolve(__dirname, 'index.html'),
+        assistant: resolve(__dirname, 'src/content/contentScript.ts'),
+        petOverlay: resolve(__dirname, 'src/content/petOverlay.ts'),
       },
       output: {
-        entryFileNames: (chunk) => {
-          if (chunk.name === 'background') return 'background.js'
-          if (chunk.name === 'contentScript') return 'contentScript.js'
-          return '[name].js'
+        entryFileNames: (chunkInfo) => {
+          if (chunkInfo.name === 'assistant') return 'content/assistant.js';
+          if (chunkInfo.name === 'petOverlay') return 'content/petOverlay.js';
+          return '[name].js';
         },
-        chunkFileNames: 'assets/[name].[hash].js',
-        assetFileNames: 'assets/[name].[ext]'
-      }
-    }
-  }
-})
+        chunkFileNames: 'chunks/[name]-[hash].js',
+        assetFileNames: 'assets/[name].[ext]',
+      },
+    },
+  },
+  publicDir: 'public',
+});
